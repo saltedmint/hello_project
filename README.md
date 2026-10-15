@@ -1,0 +1,91 @@
+# hello / rhythm
+
+`hello`의 입력 리듬을 타악기와 글자 사이 거리로 표현하는 데스크톱 키보드용 프로토타입입니다. 외부 라이브러리·빌드·API 키가 필요하지 않습니다. 음원과 폰트를 로컬에 포함했으며, 실행 중 외부 서버로 요청하지 않습니다.
+
+## 실행과 사용
+
+**간단 실행:** `index.html`을 더블클릭해 Chrome 또는 Edge에서 열면 됩니다. 서버 없이도 네 드럼 음원을 불러옵니다. `index.html`만 따로 옮기지 말고 프로젝트 폴더 전체를 유지하세요.
+
+개발·자동 검증 시에는 이 폴더에서 다음 명령을 실행하고 <http://localhost:8000>을 엽니다. 종료는 `Ctrl+C`.
+
+```powershell
+python -m http.server 8000 --bind 127.0.0.1
+```
+
+1. 영문 입력 모드로 전환하고 **입력 시작**을 누릅니다.
+2. 자신의 속도로 소문자 `hello`를 입력합니다. 두 `l`은 키를 뗐다가 다시 누릅니다. 입력 중에는 소리가 나지 않고 일정한 자간을 유지합니다.
+3. 다섯 글자가 완료되면 입력 간격에 따른 자간과 시간 수치가 표시됩니다. 긴 결과는 글자 영역 안에서 가로로 스크롤합니다.
+4. **리듬 듣기**를 누르면 킥 → 스네어 → 하이햇 → 하이햇 → 톰 순서로 재생하며 각 글자의 색이 잠깐 바뀝니다.
+5. **정지**는 현재 소리·미래 예약·시각 반응을 취소하고 기록은 유지합니다. **다시 입력하기**는 이를 모두 취소하고 기록을 지운 뒤 입력 영역으로 포커스를 옮깁니다.
+
+음원 준비 전에는 재생할 수 없습니다. 실패하면 파일명·HTTP 오류 또는 디코딩 원인과 **음원 다시 불러오기** 버튼을 표시합니다. HTTP 요청 제한 시간은 10초입니다. 폰트 로딩에 실패하면 Georgia → Times New Roman → 시스템 serif 순으로 대체하며 입력·재생을 차단하지 않습니다.
+
+파일을 직접 여는 `file://`에서는 브라우저가 WAV의 `fetch()` 요청을 차단하므로, `assets/drums/embedded.js`에 포함한 동일 WAV 바이트를 디코딩합니다. HTTP 실행에서는 기존 WAV 파일을 요청합니다. 내장 데이터도 동일한 CC0 음원이며 합성음으로 대체하지 않습니다. 음원을 변경하면 `python scripts/build-embedded.py`로 내장 파일을 다시 만들고 `python scripts/build-embedded.py --check`로 원본과 일치하는지 확인하세요. 브라우저 보안 설정을 변경할 필요가 없습니다.
+
+오타·대문자·붙여넣기·조합 입력·키 자동 반복은 기록하지 않습니다. Backspace 수정은 지원하지 않습니다. 입력 영역이나 창이 포커스를 잃으면 시도를 취소합니다. 기록은 페이지 메모리에만 남습니다.
+
+## 시간과 시각화
+
+기존 `Recorder.times` 배열에 `performance.now()` keydown 시각을 저장하는 구조를 유지합니다. `relative`는 첫 `h`를 뺀 다섯 상대 시각, `gaps`는 인접 시각의 차이 네 개입니다. 첫 글자까지 기다린 시간은 제외합니다. 계산에는 원래 정밀도를 유지하며 화면에서만 0.1ms로 반올림합니다.
+
+`rhythm.js`의 `SPACING` 한곳에서 자간을 조절합니다.
+
+```js
+const SPACING = Object.freeze({ minimumPx: 12, pixelsPerMs: 0.12 });
+// 각 글자 왼쪽 추가 여백 = 12px + 앞 글자와의 입력 간격(ms) × 0.12
+```
+
+예시 상대 시각 `[0,180,420,570,900]ms`의 간격은 `[180,240,150,330]ms`, 추가 여백은 `[33.6,40.8,30,51.6]px`입니다. 입력 중에는 네 여백을 모두 12px로 유지합니다. 완료 후 각 글자의 margin을 따로 설정하며 글자 크기·글자 자체의 폭은 바꾸지 않습니다. 모든 기록에 같은 계수를 적용하고 화면 폭에 맞춘 정규화나 간격 상한을 두지 않습니다.
+
+음원은 `OfflineAudioContext`로 미리 디코딩하고 메모리에 저장합니다. 클릭으로 만든 `AudioContext`가 suspended이면 resume합니다. 첫 타격은 `currentTime + 60ms`, 나머지는 여기에 `relative / 1000`을 더해 `AudioBufferSourceNode.start()`로 한 번에 예약합니다. 속도 변경·박자 보정·연속 setTimeout 재생은 없습니다. 모든 타격은 별개의 소스이며 자연스러운 꼬리가 끝날 때까지 겹쳐 재생됩니다.
+
+시각 반응은 `requestAnimationFrame`에서 같은 `AudioContext.currentTime`을 읽어 해당 인덱스를 120ms 동안 강조합니다. 두 `l`은 별개 이벤트이며, 아주 빠르면 강조 구간도 겹칠 수 있습니다. CSS는 색만 바꾸고 위치·크기·여백을 바꾸지 않습니다. 정지 시 RAF와 타임라인을 지우고 이전 콜백도 무효화합니다. 화면 갱신은 디스플레이 주기에 제한되며 실제 소리와 화면에는 기기별 출력 지연이 있을 수 있습니다.
+
+## 음원 선택과 출처
+
+네 타격에 필요한 파일만 직접 재생하면 되므로 별도 브라우저 가상악기나 샘플러 라이브러리 대신 기존 Web Audio를 유지했습니다. 파일 라이선스가 명시된 [tidalcycles/sounds-tr808-fischer](https://github.com/tidalcycles/sounds-tr808-fischer)의 **Michael Fischer / Technopolis, Roland TR-808 Sound Sample Set 1.0.0 (1994)**를 선택했습니다. 저장소의 **CC0 1.0 Universal** 라이선스를 확인하고 원문과 제작자 설명을 함께 포함했습니다.
+
+고정 출처 커밋: `85fbecf1bec32553395625ea659e2a56dfd7c0e1`. WAV 파일 내용은 수정하지 않고 로컬 이름만 변경했습니다.
+
+| 글자 | 악기 | 원본 경로 | 로컬 파일 | 재생 gain |
+| --- | --- | --- | --- | --- |
+| h | 킥 | `bd8/BD5000.WAV` | `assets/drums/kick.wav` | 0.22 |
+| e | 스네어 | `sd8/SD5050.WAV` | `assets/drums/snare.wav` | 0.18 |
+| l | 닫힌 하이햇 | `ch8/CH.WAV` | `assets/drums/hat.wav` | 0.12 |
+| o | 미드 톰 | `mt8/MT50.WAV` | `assets/drums/tom.wav` | 0.20 |
+
+원본 파일은 [고정 커밋의 저장소](https://github.com/tidalcycles/sounds-tr808-fischer/tree/85fbecf1bec32553395625ea659e2a56dfd7c0e1)에서 확인할 수 있습니다. 라이선스는 `assets/drums/CC0.txt`, 원 제작자 설명은 `assets/drums/SOURCE-README.txt`에 있습니다. 각 버퍼를 로딩 때 피크 1로 정규화한 후 악기별 gain을 적용합니다. 다섯 음이 모두 겹쳐도 gain 합은 0.84이므로 디지털 클리핑을 피합니다. 음량 균형은 실제 발표용 스피커에서 추가 청취 확인이 필요합니다.
+
+## 폰트 선택과 출처
+
+**Bodoni Moda**, The Bodoni Moda Project Authors / Owen Earl. 가는 획과 굵은 획의 대비가 분명한 세리프 폰트입니다. [Google Fonts 원본](https://github.com/google/fonts/tree/main/ofl/bodonimoda)의 정자체 가변 폰트 `BodoniModa[opsz,wght].ttf`를 수정 없이 `assets/fonts/BodoniModa.ttf`로 포함했습니다. 116px / weight 500 / optical size 96으로 고정합니다.
+
+이용 조건은 **SIL Open Font License 1.1**이며 저작권·라이선스 원문을 `assets/fonts/OFL.txt`에 함께 포함했습니다. 폰트 단독 판매는 금지되고, 앱과 함께 배포할 때 저작권과 라이선스 안내를 유지해야 합니다. [공식 라이선스 원문](https://github.com/google/fonts/blob/main/ofl/bodonimoda/OFL.txt)을 참고하세요.
+
+## 검증
+
+서버 실행 후 <http://localhost:8000/tests.html>을 열면 자동 검증합니다. 검증 중에는 창을 조작하지 마세요. 2026-10-16 Chrome headless에서 **36/36 통과**했습니다. 내장 WAV 네 개의 원본 바이트 일치, 실제 디코딩과 재시도용 버퍼 재생성 검증을 추가했습니다. 1280×1000 화면 배치는 이전 검증에서 이미지로 확인했습니다.
+
+직접 열기 오류도 수정 전 `file://`에서 재현한 뒤 수정 후 검증했습니다. 실제 `index.html`의 음원·폰트 준비 완료를 확인했고, 같은 앱에 `scripts/file-smoke.js`를 추가한 임시 검증 페이지에서 fetch를 차단한 상태로 네 음원 디코딩·실제 오프라인 오디오 렌더·입력 완료·재생·정지·재재생·초기화를 확인했습니다. 자동 재생 조작에는 headless 검증용 autoplay 허용 옵션을 사용했으며, 일반 사용자 화면에서는 기존과 같이 재생 버튼 클릭으로 AudioContext를 활성화합니다. 실제 스피커 청취는 수행하지 않았습니다.
+
+- 기존 입력 계산, 오타·조합·반복 키 무시, 첫 글자 대기 제외와 두 `l`의 keyup 구분.
+- 악기 순서, 동일 하이햇 버퍼의 별도 타격, 원래 예약 시각, 빠른 입력 시 소리 겹침, 악기별 gain.
+- 실제 로컬 WAV 네 개의 fetch·디코딩과 피크 정규화.
+- **실제 Web Audio 오프라인 렌더**를 각 음의 기대 시작 시각에 합산한 PCM 파형과 비교하여 순서·간격·겹침 보존 확인. 정지 후 미래 음 예약의 렌더 결과가 무음임을 확인.
+- 공통 선형 자간, 같은 간격의 같은 여백, 입력 중 고정 자간, 긴 간격의 영역 내 스크롤, 강조 전후 위치·폭·높이 불변.
+- 오디오 시계를 읽는 글자별 강조, 정지 시 프레임·강조 취소, resume 대기 중 취소, 반복적인 정지·재입력·재재생.
+- 음원 HTTP 오류·손상된 파일, 실패 후 재시도, 준비 전 재생 차단. 별도 실제 앱 인스턴스에서 음원 실패 안내·재시도와 폰트 404 대체 처리 확인.
+
+**직접 확인하지 않은 수동 항목:** 물리 키보드 길게 누르기·OS 한글 IME 전환, 실제 창 전환 취소, 실제 suspended AudioContext의 클릭 활성화, 스피커에서 들리는 타악기 구분·음량 균형·간격·정지 후 무음 및 화면과 소리의 체감 동기. 자동 UI 테스트는 합성 키 이벤트와 오디오 모형을 사용하고, 파형 테스트는 실제 브라우저의 오프라인 오디오 엔진을 사용합니다. 스피커 청취를 수행한 결과는 아닙니다.
+
+## 파일
+
+- `index.html`, `styles.css`: 화면, 로컬 폰트, 글자별 여백과 색 강조.
+- `rhythm.js`: 기존 Recorder, 공통 자간 설정, SampleBank, RhythmPlayer, PlaybackVisual.
+- `app.js`: 입력과 결과 표시, 준비·실패·재시도, 재생·정지·초기화 연결.
+- `tests.html`, `tests.js`: 자동 검증 페이지와 테스트.
+- `assets/drums/`, `assets/fonts/`: 로컬 리소스와 출처·라이선스 원문.
+- `assets/drums/embedded.js`, `scripts/build-embedded.py`: 직접 열기용 WAV 내장 데이터와 생성·일치 검사 도구.
+- `scripts/file-smoke.js`: 직접 열기 경로의 앱 동작 검증용 스크립트(일반 앱에서는 로딩하지 않음).
+
+반복 재생, 여러 사람 비교, 로그인·DB·MIDI·Ableton 연동은 포함하지 않습니다.
