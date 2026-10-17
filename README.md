@@ -1,6 +1,49 @@
-# hello / rhythm
+# hello / experiments
 
 `hello → Enter`를 네 번 입력해 네 마디의 리듬을 타악기와 글자 사이 거리로 표현하는 데스크톱 키보드용 프로토타입입니다. 외부 라이브러리·빌드·API 키가 필요하지 않습니다. 음원과 폰트를 로컬에 포함했으며, 실행 중 외부 서버로 요청하지 않습니다.
+
+## A · B 모드와 현재 범위
+
+시작 화면에서 모드를 선택하고 상단 메뉴로 전환합니다.
+
+| 모드 | 목적 | 현재 구현 |
+| --- | --- | --- |
+| A · 인사 오케스트라 | 개인의 리듬을 타악기와 손글씨 선율로 표현 | 기존 네 마디 입력, 타악기, 반복 재생, 자간, 선택적 손글씨, WAV 유지 |
+| B · 인사 사운드스케이프 | 여러 기록을 전자음으로 겹치는 후속 실험 | **준비 중** 화면과 JSON 데이터 연결만 제공. 사운드 엔진·레이어·서버·공개 수집 미구현 |
+
+A에서 만든 기록은 B 목록에서도 확인할 수 있습니다. B는 오디오 장치 없이도 열립니다. 모드 전환은 A의 소리·예약·반복 타이머·애니메이션·입력 리스너를 정리하고 진행 중인 입력을 취소합니다. 완료된 기록은 페이지 메모리에 보존합니다. 페이지를 닫기 전 JSON을 다운로드하세요.
+
+## 공통 JSON 저장 · 불러오기
+
+네 마디 입력 완료 후 상단 **기록 JSON 다운로드**를 누릅니다. **기록 JSON 불러오기**로 복원하면 A의 리듬, Enter 간격, 선택한 완료 손글씨와 선율 음량도 복원합니다. A에서는 기존 네 마디 형식을 지원하며, B는 공통 형식의 다른 기록도 연결할 수 있습니다. 파일은 서버로 보내지 않습니다. 동일 id는 목록에서 갱신합니다.
+
+`examples/typing-example.json`은 **합성 예시 · 실제 참여자 아님**으로 표시합니다. 화면의 예시 다운로드 후 불러오기로 시험할 수 있습니다.
+
+| 항목 | 의미 |
+| --- | --- |
+| `schemaVersion` | 현재 `1` |
+| `id` | 기록 식별자 |
+| `text` | 입력 글자열. A는 `hello` 네 번, 총 20글자 |
+| `relativeTimesMs` | 원본 keydown 기준 첫 글자=0인 상대 시각 배열. 글자 수와 길이가 같음 |
+| `durationMs` | 원본 첫 글자부터 마지막 글자까지. 배열 마지막 값과 같음 |
+| `source` (선택) | `local`, `imported`, `example`. 생략 시 `imported` |
+| `raw` (선택) | `clock: "performance.now"`, 원본 `keyDownTimesMs`, 선택적 `enterTimesMs` |
+| `a` (선택) | A 전용 네 마디 `bars[].endMs`(각 h→Enter), 선택적 `handwriting: { strokes, volume }` |
+
+공통 상대 시각은 **마디 사이 실제 준비 대기까지 포함한 원본**입니다. A의 재생 시각(`Recorder.relative`)은 기존 규칙대로 각 h→Enter를 연결해 준비 대기를 제외합니다. 원본과 재생 변환을 섞어 저장하지 않습니다. 손글씨는 정규화 x/y와 원래 down/move/up 시각을 저장하고, 선율은 불러올 때 다시 계산합니다. WAV는 JSON과 별도이며 기존 JSON 저장 형식은 없었으므로 이번 버전부터 schemaVersion 1을 사용합니다.
+
+불러오기는 2MB 제한, 스키마 버전·id·글자 수·이벤트 수·유한한 숫자·시각 순서·첫 시각·전체 길이·원본과 상대 시각 일치·A 마디와 획 데이터를 검증합니다. 모든 검증이 끝난 뒤 적용하므로 잘못된 파일이 기존 기록을 지우지 않습니다. 공통 형식은 최대 256글자/1시간, A 손글씨는 최대 1,000획/50,000점입니다.
+
+## 브랜치 · 체크포인트
+
+- `main`: 이번 작업에서는 병합하지 않습니다.
+- `prototype-a-v1`: 변경 전 A를 보존한 annotated tag. 체크포인트 커밋 `5a3cc9b`는 기존 코드 트리를 그대로 보존합니다. `git switch -c inspect/prototype-a prototype-a-v1`으로 별도 브랜치에서 확인할 수 있습니다.
+- `refactor/experiment-modes`: 공통 모듈·모드 화면·JSON 재사용 기반을 정리하는 작업 브랜치.
+- `feat/soundscape-b`: 구조 정리 결과와 같은 커밋에서 출발하는 후속 B 작업 브랜치. 이번에는 B 사운드를 구현하지 않습니다.
+
+두 모드를 영구적으로 다른 브랜치에 두지 않습니다. 향후 검토·병합 후 main의 시작 화면에서 모두 실행하는 구조입니다. 기존 이력과 태그를 덮어쓰거나 force push하지 않습니다.
+
+다음 B 구현은 `feat/soundscape-b`의 `modes/soundscape.js`에서 시작합니다. `HelloSoundscape.setRecords()` / `getRecords()`가 검증된 데이터 연결 지점입니다. `common/typing.js`, `common/recording.js`, `common/audio.js`를 재사용하고, B 전용 전자음·누적·반복·레이어 관리는 B 모듈에서 추가합니다. 서버나 공개 수집은 별도 설계 범위입니다.
 
 ## 실행과 사용
 
@@ -11,6 +54,8 @@
 ```powershell
 python -m http.server 8000 --bind 127.0.0.1
 ```
+
+먼저 시작 화면에서 **A · 인사 오케스트라**를 선택합니다.
 
 1. 영문 입력 모드로 전환하고 **입력 시작**을 누릅니다.
 2. 자신의 속도로 소문자 `hello`를 입력하고, 원하는 간격을 두고 **Enter**를 누릅니다. 이를 **네 번** 반복합니다. 두 `l`은 키를 뗐다가 다시 누릅니다. 입력 중에는 소리가 나지 않고 네 줄 모두 일정한 자간을 유지합니다.
@@ -48,7 +93,7 @@ Canvas 좌표는 0~1로 정규화합니다. 아래부터 위까지 C4·D4·E4·G
 
 내보내기는 기존 화면 재생과 같은 `HelloRhythm.buildEvents()`와 `scheduleEvents()`를 사용합니다. 재생과 동일한 60ms 준비 구간 뒤 첫 타격을 배치하고, 실제 샘플 길이와 선율 release를 모두 계산한 뒤 끝에 100ms 여유를 붙입니다. 렌더링에는 **OfflineAudioContext**만 사용하며 다운로드를 시작하면 현재 스피커 재생을 정지합니다. 렌더 중에는 두 다운로드 버튼과 입력·선율 변경을 잠그고, 완료나 실패 후 다시 사용할 수 있게 합니다.
 
-반복 파일에서 **T는 기존 네 마디 시간축의 첫 h부터 마지막 o까지**이고, 반복 시작 간격은 `T + 0.5초`입니다. 이는 화면의 실시간 루프(o→Enter 간격)와 별개의 내보내기 규칙입니다. `wav-export.js`의 `SETTINGS.repeatGapSeconds` 한곳에서 0.5초를 조절할 수 있습니다. 모든 반복의 타격·선율 시작과 종료 간격을 유지하며, 마지막 o와 다음 h 사이의 시작 간격은 0.5초입니다. 잔향은 다음 반복과 겹칠 수 있고 강제로 끊지 않습니다.
+반복 파일에서 **T는 기존 네 마디 시간축의 첫 h부터 마지막 o까지**이고, 반복 시작 간격은 `T + 0.5초`입니다. 이는 화면의 실시간 루프(o→Enter 간격)와 별개의 내보내기 규칙입니다. `modes/orchestra-wav.js`의 `SETTINGS.repeatGapSeconds` 한곳에서 0.5초를 조절할 수 있습니다. 모든 반복의 타격·선율 시작과 종료 간격을 유지하며, 마지막 o와 다음 h 사이의 시작 간격은 0.5초입니다. 잔향은 다음 반복과 겹칠 수 있고 강제로 끊지 않습니다.
 
 완전한 단위만 저장하므로 정확히 목표 길이에 맞추려 재생 속도를 바꾸거나 마지막 반복을 자르지 않습니다. 한 단위의 잔향까지 포함한 길이가 20초를 넘으면 한 번만 저장합니다. 긴 단위 때문에 15~20초 안에 맞는 정수 반복 횟수가 없는 경우에는 그 구간에 가장 가까운 완전한 길이를 선택하고 버튼 옆에 안내합니다. 파일에는 60ms 준비 시간과 마지막 100ms 여유도 들어가므로 표시한 음악 구간보다 약간 길 수 있습니다. 브라우저 메모리를 위해 10분을 넘는 렌더는 안내 후 거부합니다.
 
@@ -60,7 +105,7 @@ Canvas 좌표는 0~1로 정규화합니다. 아래부터 위까지 C4·D4·E4·G
 
 전체 `Recorder.relative`는 앞 마디들의 `durationMs` 합에 해당 마디의 상대 시각을 더한 20개 시각입니다. 전체 길이는 네 마디 길이의 합입니다. 첫 글자까지 기다린 시간과 **Enter 뒤 다음 hello를 준비하는 대기 시간은 제외**하고 각 마디의 h→Enter 구간을 그대로 이어 붙입니다. 마디 길이를 같게 만들거나 BPM에 맞추지 않습니다. 계산에는 원래 정밀도를 유지하며 화면에서만 0.1ms로 반올림합니다.
 
-`rhythm.js`의 `SPACING` 한곳에서 자간을 조절합니다.
+`modes/orchestra-audio.js`의 `SPACING` 한곳에서 자간을 조절합니다.
 
 ```js
 const SPACING = Object.freeze({ minimumPx: 12, pixelsPerMs: 0.12 });
@@ -98,7 +143,11 @@ const SPACING = Object.freeze({ minimumPx: 12, pixelsPerMs: 0.12 });
 
 ## 검증
 
-서버 실행 후 <http://localhost:8000/tests.html>을 열면 자동 검증합니다. 검증 중에는 창을 조작하지 마세요. Chrome이 설치된 Windows에서는 `python scripts/verify-browser.py`로 HTTP와 file:// 테스트를 함께 실행할 수 있습니다. 다른 Chromium 경로는 환경 변수 `HELLO_TEST_BROWSER`로 지정합니다. 2026-10-17 Chrome headless에서 **105/105 통과**, 별도 file:// 입력·손글씨·함께 듣기·삭제·정지·재입력 검증도 통과했습니다. 1280×2000 화면 이미지로 손글씨 구역·음 이름·획·컨트롤 배치를 확인했습니다.
+구조 변경 후 기존 입력·반복키 무시·두 l·재생·손글씨 생략·자간·WAV 검증을 유지했습니다. 추가 검증은 JSON 원본/재생 시각 구분, 소수 시각 보존, 잘못된 파일 거부와 기존 기록 보존, 손글씨 복원, 동일 id 갱신, 실제 File 입력, 모드 전환 중 파일 읽기/렌더 취소, 소리·RAF·키 리스너 해제, 반복 전환 시 중복 방지, B 단독 진입(오디오 API 없음)을 포함합니다.
+
+`python scripts/verify-downloads.py`는 실제 JSON 파일을 다운로드하여 20개 원본 시각·전체 길이·손글씨·음량을 확인하고 WAV 두 파일도 검사합니다. 네이티브 입력 장치와 스피커 직접 청취는 아래 수동 확인 항목에 해당합니다.
+
+서버 실행 후 <http://localhost:8000/tests.html>을 열면 자동 검증합니다. 검증 중에는 창을 조작하지 마세요. Chrome이 설치된 Windows에서는 `python scripts/verify-browser.py`로 HTTP와 file:// 테스트를 함께 실행할 수 있습니다. 다른 Chromium 경로는 환경 변수 `HELLO_TEST_BROWSER`로 지정합니다. 2026-10-17 Chrome headless에서 **133/133 통과**, 별도 file:// 입력·손글씨·함께 듣기·삭제·정지·재입력 검증도 통과했습니다. 1280×2000 화면 이미지로 손글씨 구역·음 이름·획·컨트롤 배치를 확인했습니다.
 
 WAV 검증은 헤더·비트 깊이·채널·길이, 실제 WAV 디코딩, 실시간 재생 로직과의 파형 비교, 반복별 20타격의 시작 시각과 샘플, 잔향과 마지막 무음 여유, 동일 감쇠·클리핑 방지, 선율 생략, 샘플 미준비와 렌더 실패 안내, 중복 클릭 차단 및 재시도 복구를 포함합니다. `python scripts/verify-downloads.py`는 별도 임시 Chrome 프로필에서 **실제로 두 파일을 다운로드**하고 Python `wave`로 검사합니다. 테스트 결과 원본 **5.66002초**, 반복 **15.66002초**, 모두 스테레오 44100Hz·PCM16이며 피크는 각각 8296/32768과 8628/32768, 마지막 80ms는 무음이었습니다. 스피커용 AudioContext 생성을 막은 상태에서도 렌더·다운로드에 성공했습니다. 검증 파일과 프로필은 임시 폴더에서만 생성하고 검사 후 제거합니다.
 
@@ -118,13 +167,22 @@ WAV 검증은 헤더·비트 깊이·채널·길이, 실제 WAV 디코딩, 실�
 
 ## 파일
 
+- `app.js`: 시작 화면, A/B 전환, 공통 JSON 입출력과 메모리 기록 목록.
+- `common/typing.js`: 기존 네 마디 키 입력·시각 기록.
+- `common/recording.js`: 버전 1 공통 기록 검증·다운로드.
+- `common/audio.js`: AudioContext 활성화와 예약 음원 정리.
+- `modes/orchestra-data.js`: 공통 원본 기록과 A 마디·손글씨 상태 사이 변환.
+- `modes/soundscape.js`: 준비 중인 B 진입 화면과 기록 연결 지점.
+- `recording-tests.js`, `mode-tests.js`: JSON 검증·복원, 모드 전환과 오디오·리스너 정리 회귀 검증.
+- `examples/typing-example.json`: 실제 참여자가 아닌 합성 네 마디 기록.
+
 - `index.html`, `styles.css`: 화면, 로컬 폰트, 글자별 여백과 색 강조.
-- `rhythm.js`: 기존 Recorder, 공통 자간 설정, SampleBank, RhythmPlayer, PlaybackVisual.
-- `app.js`: 입력과 결과 표시, 준비·실패·재시도, 재생·정지·초기화 연결.
-- `handwriting.js`: 정규화된 획 기록, 음높이·시간 변환, Canvas·재생 점.
+- `modes/orchestra-audio.js`: A 자간 설정, SampleBank, RhythmPlayer, PlaybackVisual.
+- `modes/orchestra.js`: A 입력과 결과 표시, 준비·실패·재시도, 재생·정지·초기화 연결.
+- `modes/orchestra-handwriting.js`: 정규화된 획 기록, 음높이·시간 변환, Canvas·재생 점.
 - `handwriting-tests.js`: 손글씨·동시 재생의 계산·DOM·실제 오디오 검증.
 - `scripts/verify-browser.py`: 설치된 Chrome으로 HTTP와 직접 열기 검증 실행.
-- `wav-export.js`: 반복 길이 계획, 공통 이벤트 오프라인 렌더, 피크 검사·PCM16 인코딩·Blob 다운로드.
+- `modes/orchestra-wav.js`: 반복 길이 계획, 공통 이벤트 오프라인 렌더, 피크 검사·PCM16 인코딩·Blob 다운로드.
 - `wav-export-tests.js`: WAV 헤더·파형·반복·다운로드 UI 검증.
 - `scripts/verify-downloads.py`: 실제 원본·반복 WAV 다운로드 및 Python wave 검사.
 - `tests.html`, `tests.js`: 자동 검증 페이지와 테스트.
