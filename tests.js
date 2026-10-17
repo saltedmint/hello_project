@@ -10,12 +10,26 @@
   function assert(value, message = 'assertion failed') { if (!value) throw new Error(message); }
   const same = (a, b) => assert(JSON.stringify(a) === JSON.stringify(b), `${JSON.stringify(a)} != ${JSON.stringify(b)}`);
   const key = (letter, overrides = {}) => ({ key: letter, code: `Key${letter.toUpperCase()}`, ...overrides });
-  const { Recorder, RhythmPlayer, SampleBank, PlaybackVisual, spacingFor, activeIndices } = HelloRhythm;
+  const { BarRecorder: Recorder, RhythmPlayer, SampleBank, PlaybackVisual, spacingFor, activeIndices } = HelloRhythm;
   check('첫 글자까지의 대기 제외 · 상대 시각 · 간격 · 전체 시간', () => {
     const r = new Recorder(); r.start();
     [...'hello'].forEach((letter, i) => { r.keydown(key(letter), 9000 + [0, 180, 420, 570, 900][i]); r.release(key(letter).code); });
     same(r.relative, [0, 180, 420, 570, 900]); same(r.gaps, [180, 240, 150, 330]);
-    assert(r.relative[4] === 900 && !r.active);
+    assert(r.relative[4] === 900 && r.active && !r.complete);
+    assert(r.keydown(key('Enter'), 10200) === 'complete');
+    assert(r.loopGapMs === 300 && r.durationMs === 1200 && !r.active);
+    same(r.relative, [0, 180, 420, 570, 900]);
+  });
+  check('Enter: 조기 입력·반복·조합 무시 · o 뒤 Enter만 완료 · 초기화', () => {
+    const r = new Recorder(); r.start();
+    assert(r.keydown(key('Enter'), 1) === 'wrong'); r.release('KeyENTER');
+    [...'hello'].forEach((letter, i) => { r.keydown(key(letter), 100 + i * 100); r.release(key(letter).code); });
+    assert(r.active && r.loopGapMs === null);
+    assert(r.keydown(key('Enter', { repeat: true }), 700) === 'repeat');
+    assert(r.keydown(key('Enter', { isComposing: true }), 800) === 'composition'); r.release('KeyENTER');
+    assert(!r.complete && r.times.length === 5);
+    r.keydown(key('Enter'), 900); assert(r.complete && r.loopGapMs === 400 && r.durationMs === 800);
+    r.reset(); assert(!r.complete && r.enterTime === null && r.loopGapMs === null);
   });
   check('길게 누른 l 및 repeat 플래그 없는 중복도 무시 · keyup 후 두 번째 l 허용', () => {
     const r = new Recorder(); r.start();
@@ -38,6 +52,39 @@
     assert(spacingFor(1000) > spacingFor(500));
     same([200, 200, 200, 200].map(spacingFor), [36, 36, 36, 36]);
     assert(spacingFor(10000) === 1212);
+  });
+  const fourRecord = new HelloRhythm.Recorder(); fourRecord.start();
+  const patterns = [[0,180,420,570,900,1200], [0,100,200,300,400,600], [0,50,100,150,200,300], [0,200,400,600,800,1100]];
+  const inputBar = (recorder, pattern, origin) => {
+    let result;
+    [...'hello', 'Enter'].forEach((letter, i) => {
+      result = recorder.keydown(key(letter), origin + pattern[i]); recorder.release(key(letter).code);
+    });
+    return result;
+  };
+  for (let i = 0; i < 3; i++) {
+    const result = inputBar(fourRecord, patterns[i], 1000 + i * 10000);
+    check(`${i + 1}마디 Enter 후 다음 마디로 이동 · 전체 완료 금지`, () => {
+      assert(result === 'bar-complete' && fourRecord.completedBars === i + 1 && fourRecord.active && !fourRecord.complete);
+      assert(fourRecord.current.times.length === 0 && fourRecord.durationMs === null);
+    });
+  }
+  const fourthResult = inputBar(fourRecord, patterns[3], 40000);
+  check('네 번째 Enter만 전체 완료 · 20글자와 네 마디 끝 간격 저장', () => {
+    assert(fourthResult === 'complete' && fourRecord.complete && !fourRecord.active && fourRecord.times.length === 20);
+    same(fourRecord.bars.map(bar => bar.loopGapMs), [300,200,100,300]);
+    assert(fourRecord.durationMs === 3200 && fourRecord.loopGapMs === 300);
+  });
+  check('네 마디 연결: 준비 시간 제외 · 각 h→Enter 길이를 누적 · 보정 없음', () => {
+    same(fourRecord.relative, [0,180,420,570,900,1200,1300,1400,1500,1600,1800,1850,1900,1950,2000,2100,2300,2500,2700,2900]);
+    assert(fourRecord.keydown(key('h'), 50000) === 'inactive');
+  });
+  check('다음 마디 조기 Enter와 자동 반복은 마디를 건너뛰지 않음 · 초기화는 전부 삭제', () => {
+    const r = new HelloRhythm.Recorder(); r.start(); inputBar(r, patterns[0], 0);
+    assert(r.keydown(key('Enter', { repeat: true }), 1300) === 'repeat');
+    assert(r.keydown(key('Enter'), 1400) === 'wrong'); r.release(key('Enter').code);
+    assert(r.completedBars === 1 && r.current.times.length === 0);
+    r.reset(); assert(r.completedBars === 0 && r.times.length === 0 && r.held.size === 0 && !r.active);
   });
   function fakeAudio(state = 'running') {
     const sources = [], gains = [];
@@ -96,6 +143,47 @@
   const pending = pendingPlayer.play([0, 10, 20, 30, 40], () => {});
   pendingPlayer.stop(); resume(); await pending;
   check('resume 대기 중 취소하면 늦은 예약 없음', () => assert(suspended.sources.length === 0));
+
+  const loopAudio = fakeAudio(); let queueLoop, cleared = 0, loopCompleted = 0;
+  const loopTimers = { setInterval(fn) { queueLoop = fn; return 7; }, clearInterval(id) { assert(id === 7); cleared++; } };
+  const looping = new RhythmPlayer(() => loopAudio.context, fakeBank(), loopTimers);
+  await looping.play([0, 180, 420, 570, 900], () => loopCompleted++, { loop: true, loopGapMs: 300 });
+  loopAudio.sources.slice().forEach(source => source.onended());
+  check('루프: 한 패턴이 끝나도 재생 상태와 중복 재생 잠금 유지', () => {
+    assert(looping.playing && looping.looping && loopCompleted === 0);
+  });
+  loopAudio.context.currentTime = 11.1; queueLoop();
+  check('루프: 다음 패턴의 원래 간격 보존 · o→h는 기록한 o→Enter 300ms', () => {
+    same(loopAudio.sources.slice(-5).map(source => Math.round((source.startAt - 11.26) * 1000)), [0, 180, 420, 570, 900]);
+    assert(Math.abs(loopAudio.sources[5].startAt - loopAudio.sources[4].startAt - .3) < 1e-8);
+  });
+  loopAudio.context.currentTime = 12.32; queueLoop();
+  check('루프: 예약 시각은 이전 타이머 실행 시각에 영향받지 않음', () => {
+    assert(Math.abs(loopAudio.sources[10].startAt - 12.46) < 1e-8);
+    same(activeIndices(looping.events, 12.47), [0]);
+  });
+  const countBeforeStop = loopAudio.sources.length;
+  looping.stop(); queueLoop();
+  check('루프 정지: 타이머·모든 소스·타임라인 취소 · 늦은 콜백 무시', () => {
+    assert(cleared === 1 && loopAudio.sources.length === countBeforeStop && !looping.playing);
+    assert(looping.events.length === 0 && looping.voices.size === 0 && looping.loopTimer === null);
+    assert(loopAudio.sources.slice(-10).every(source => source.disconnected && source.stops.at(-1) === 12.32));
+  });
+  const zeroGapAudio = fakeAudio(); let zeroQueue;
+  const zeroGapPlayer = new RhythmPlayer(() => zeroGapAudio.context, fakeBank(),
+    { setInterval(fn) { zeroQueue = fn; return 1; }, clearInterval() {} });
+  await zeroGapPlayer.play([0, 180, 420, 570, 900], () => {}, { loop: true, loopGapMs: 0 });
+  zeroGapAudio.context.currentTime = 10.8; zeroQueue();
+  check('루프: 기록한 끝 간격 0ms도 고정 간격 보정 없이 유지', () => {
+    assert(zeroGapAudio.sources[5].startAt === zeroGapAudio.sources[4].startAt);
+  });
+  zeroGapPlayer.stop();
+  let missingEnterError;
+  try { await zeroGapPlayer.play([0, 180, 420, 570, 900], () => {}, { loop: true }); }
+  catch (error) { missingEnterError = error; }
+  check('Enter 간격 없는 루프 요청은 기본 0.5초를 사용하지 않고 거부', () => {
+    assert(missingEnterError && !zeroGapPlayer.playing);
+  });
 
   let tick, cancelCount = 0;
   const elements = [...'hello'].map(() => document.createElement('span'));
@@ -168,6 +256,34 @@
   await stoppedPlayer.play([0, 180, 420, 570, 900], () => {}); stoppedPlayer.stop();
   const silent = (await stoppedOffline.startRendering()).getChannelData(0);
   check('실제 Web Audio 오프라인 렌더: 정지한 미래 예약 음은 완전한 무음', () => assert(silent.every(sample => sample === 0)));
+  const loopOffline = new OfflineAudioContext(1, 44100 * 8, 44100);
+  const loopContext = offlineAdapter(loopOffline); let offlineQueue, loopDone = 0;
+  const actualLoop = new RhythmPlayer(() => loopContext, realBank,
+    { setInterval(fn) { offlineQueue = fn; return 1; }, clearInterval() {} });
+  await actualLoop.play(fourRecord.relative, () => loopDone++, { loop: true, loopGapMs: fourRecord.loopGapMs });
+  loopContext.currentTime = 3.1; offlineQueue();
+  const loopEvents = [...actualLoop.events];
+  // The queue prunes completed highlights, so reconstruct both audio cycles.
+  const expectedLoopEvents = [0.06, 3.26].flatMap(start => fourRecord.relative.map((offset, i) => ({ at: start + offset / 1000, letter: 'hello'[i % 5] })));
+  const loopPcm = (await loopOffline.startRendering()).getChannelData(0);
+  check('실제 네 마디×두 루프 렌더: 40타격의 악기·간격·네 경계·겹침 보존', () => {
+    const expected = new Float32Array(loopPcm.length);
+    for (const event of expectedLoopEvents) {
+      const samples = realBank.buffers.get(event.letter).getChannelData(0), offset = Math.round(event.at * 44100);
+      for (let i = 0; i < samples.length; i++) expected[offset + i] += samples[i] * HelloRhythm.INSTRUMENTS[event.letter].gain;
+    }
+    let error = 0, squaredError = 0;
+    for (let i = 0; i < expected.length; i++) {
+      const difference = expected[i] - loopPcm[i];
+      error = Math.max(error, Math.abs(difference)); squaredError += difference * difference;
+    }
+    // The browser interpolates sub-sample starts; the direct PCM sum rounds to
+    // whole frames. Bound both transient error and RMS across the full render.
+    const rms = Math.sqrt(squaredError / expected.length);
+    assert(error < .003 && rms < .0001 && loopEvents.length === 20 && actualLoop.playing && loopDone === 0,
+      `error=${error}, rms=${rms}, events=${loopEvents.length}, period=${actualLoop.loopPeriod}, playing=${actualLoop.playing}, done=${loopDone}`);
+  });
+  actualLoop.stop();
   const failing = new SampleBank(async () => ({ ok: false, status: 404 })); let loadError;
   try { await failing.load(); } catch (error) { loadError = error; }
   check('음원 로딩 실패 시 원인과 파일 표시 · 준비 상태 차단', () => {
@@ -195,57 +311,69 @@
   const dispatch = (type, letter, overrides = {}) => $('input-zone').dispatchEvent(new w.KeyboardEvent(type, { bubbles: true, cancelable: true, ...key(letter), ...overrides }));
   const type = letter => { dispatch('keydown', letter); dispatch('keyup', letter); };
   const start = () => { frame.focus(); $('start').click(); };
-  const typedLetters = [...$('letters').children];
-  check('UI: 실제 로컬 폰트 준비 · 시작 시 자동 포커스 · 수치 숨김', () => {
-    assert($('font-status').textContent === 'Bodoni Moda');
-    assert($('results').hidden); start(); assert(d.activeElement === $('input-zone'));
+  const typedLetters = [...$('letters').querySelectorAll('.letter')];
+  const defaults = Array.from({ length: 20 }, (_, i) => i % 5 === 0 ? '0px' : '12px');
+  check('UI: 네 줄·20글자 · 시작 포커스 · 준비 상태', () => {
+    assert(typedLetters.length === 20 && $('font-status').textContent === 'Bodoni Moda');
+    start(); assert(d.activeElement === $('input-zone') && $('results').hidden);
   });
-  check('UI: 붙여넣기 · IME · 영역 밖 이벤트 무시 · 입력 중 고정 자간', () => {
-    const before = typedLetters.map(el => el.style.marginLeft);
+  check('UI: IME·붙여넣기·영역 밖 입력 무시', () => {
     $('input-zone').dispatchEvent(new w.Event('paste', { cancelable: true }));
     $('input-zone').dispatchEvent(new w.Event('compositionstart')); type('h');
     $('input-zone').dispatchEvent(new w.Event('compositionend'));
     d.body.dispatchEvent(new w.KeyboardEvent('keydown', key('h')));
     assert(!typedLetters[0].classList.contains('recorded'));
-    type('h'); type('e'); same(typedLetters.map(el => el.style.marginLeft), before);
   });
-  // Control performance.now only for a deterministic long-gap recording in the actual UI.
-  $('reset').click(); let now = 5000;
-  Object.defineProperty(w.performance, 'now', { configurable: true, value: () => now });
-  [0, 180, 420, 570, 10000].forEach((ms, i) => { now = 5000 + ms; type('hello'[i]); });
-  check('UI: 완료 후 개별 자간 적용 · 큰 간격 가로 스크롤 · 글자 폭 유지', () => {
-    same(typedLetters.map(el => parseFloat(el.style.marginLeft)).map(Math.round), [0, 34, 41, 30, 1144]);
+  let now = 1000;
+  Object.defineProperty(w.performance, 'now', { configurable: true, value: () => now++ });
+  const uiPattern = [0,180,420,570,10000,10420];
+  for (let bar = 0; bar < 4; bar++) {
+    const origin = 1000 + bar * 20000;
+    [...'hello'].forEach((letter, i) => { now = origin + uiPattern[i]; type(letter); });
+    check(`UI: ${bar + 1}마디 o 뒤 Enter 전 결과·재생 차단 · 20글자 기본 자간`, () => {
+      assert($('play').disabled && $('results').hidden && $('status').textContent === '입력 중');
+      same(typedLetters.map(el => el.style.marginLeft), defaults);
+    });
+    now = origin + uiPattern[5]; type('Enter');
+    if (bar < 3) check(`UI: ${bar + 1}마디 Enter 후 계속 입력 · 자동 포커스 유지`, () => {
+      assert($('play').disabled && $('results').hidden && d.activeElement === $('input-zone'));
+      assert($('bar-progress').textContent.includes(`완료 ${bar + 1}개`));
+    });
+  }
+  check('UI: 네 번째 Enter 후만 완료 · 네 마디 수치·각 줄 개별 자간·긴 결과 스크롤', () => {
+    assert($('status').textContent === '입력 완료' && !$('play').disabled && !$('results').hidden);
+    assert($('bar-metrics').children.length === 4 && $('total').textContent === '41680.0 ms');
+    for (let bar = 0; bar < 4; bar++) same(typedLetters.slice(bar * 5, bar * 5 + 5).map(el => Math.round(parseFloat(el.style.marginLeft))), [0,34,41,30,1144]);
     assert($('word-scroll').scrollWidth > $('word-scroll').clientWidth);
-    assert($('status').textContent === '입력 완료' && !$('results').hidden && !$('play').disabled);
   });
   const uiAudio = fakeAudio(); w.AudioContext = function () { return uiAudio.context; };
   $('play').click(); await Promise.resolve(); await Promise.resolve();
-  const layout = () => typedLetters.map(el => { const r = el.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; });
-  check('UI: 재생 중복 방지 · 강조 전후 위치/크기/여백 불변', () => {
-    assert($('play').disabled && !$('stop').disabled && uiAudio.sources.length === 5);
-    $('play').click(); assert(uiAudio.sources.length === 5);
-    const before = layout(); typedLetters[2].classList.add('sounding'); same(layout(), before);
+  check('UI: 20타격·네 번의 악기 순서 · 중복 재생 차단 · 강조 시 위치 불변', () => {
+    assert(uiAudio.sources.length === 20 && $('play').disabled && !$('stop').disabled);
+    $('play').click(); assert(uiAudio.sources.length === 20);
+    const before = typedLetters.map(el => el.getBoundingClientRect().width);
+    typedLetters[17].classList.add('sounding'); same(typedLetters.map(el => el.getBoundingClientRect().width), before);
+    assert(uiAudio.sources[5].startAt - uiAudio.sources[4].startAt > .4199);
   });
   $('stop').click();
-  check('UI: 정지 후 음원 예약·강조 제거 · 기존 자간 유지', () => {
-    assert(uiAudio.sources.every(s => s.disconnected && s.stops.at(-1) === 10));
-    assert(typedLetters.every(el => !el.classList.contains('sounding')));
-    assert(!$('play').disabled && parseFloat(typedLetters[4].style.marginLeft) > 1100);
+  check('UI: 정지 후 20소스와 강조 취소 · 기록 보존', () => {
+    assert(uiAudio.sources.every(source => source.disconnected && source.stops.at(-1) === 10));
+    assert(typedLetters.every(el => !el.classList.contains('sounding')) && !$('play').disabled);
   });
   $('play').click(); await Promise.resolve(); $('reset').click();
-  check('UI: 재생 중 재입력 시 음원·시각 반응 취소 · 기본 자간 복구', () => {
-    assert(uiAudio.sources.length === 10 && uiAudio.sources.every(s => s.disconnected));
-    assert($('status').textContent === '입력 중' && $('results').hidden);
-    same(typedLetters.map(el => el.style.marginLeft), ['0px', '12px', '12px', '12px', '12px']);
+  check('UI: 재생 중 재입력은 네 마디 기록·예약·강조 전부 초기화', () => {
+    assert(uiAudio.sources.length === 40 && uiAudio.sources.every(source => source.disconnected));
+    assert($('results').hidden && $('bar-progress').textContent.includes('완료 0개'));
+    same(typedLetters.map(el => el.style.marginLeft), defaults);
   });
-  [...'hello'].forEach(type); $('play').click(); await Promise.resolve();
-  uiAudio.sources.slice(-5).forEach(s => s.onended());
-  check('UI: 반복 입력 · 완료 · 재재생 · 포커스 이탈 취소', () => {
-    assert($('status').textContent === '입력 완료' && !$('play').disabled);
-    $('play').click(); $('stop').click(); $('reset').click(); type('h');
+  for (let bar = 0; bar < 4; bar++) { [...'hello'].forEach(type); type('Enter'); }
+  $('play').click(); await Promise.resolve();
+  uiAudio.sources.slice(-20).forEach(source => source.onended());
+  check('UI: 네 마디 전체가 끝나도 반복 재생 유지 · 재재생 · 포커스 이탈 취소', () => {
+    assert($('status').textContent === '재생 중' && $('play').disabled);
+    $('stop').click(); $('play').click(); $('stop').click(); $('reset').click(); type('h');
     w.dispatchEvent(new w.Event('blur')); assert($('status').textContent === '대기' && $('results').hidden);
   });
-
   // A second real app instance: inject only resource failures, then recover fetch.
   const markup = await (await fetch('index.html')).text();
   const css = await (await fetch('styles.css')).text();
@@ -259,7 +387,7 @@
   check('UI: 실제 음원 실패 안내·재시도 표시 · 폰트 404 시 대체 세리프', () => {
     assert(fd.getElementById('sound-status').textContent.includes('503'));
     assert(fd.getElementById('play').disabled);
-    assert(fw.getComputedStyle(fd.querySelector('#letters span')).fontFamily.includes('Georgia'));
+    assert(fw.getComputedStyle(fd.querySelector('#letters .letter')).fontFamily.includes('Georgia'));
   });
   fw.fetch = fw.originalFetch; fd.getElementById('retry-sounds').click();
   await until(() => fd.getElementById('sound-status').textContent.includes('완료'));

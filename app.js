@@ -4,7 +4,7 @@
   const recorder = new HelloRhythm.Recorder();
   const player = new HelloRhythm.RhythmPlayer();
   const zone = $('input-zone');
-  const letters = [...$('letters').children];
+  const letters = [...$('letters').querySelectorAll('.letter')];
   const visual = new HelloRhythm.PlaybackVisual(letters);
   let state = 'waiting';
   let composing = false;
@@ -17,19 +17,25 @@
     $('stop').disabled = state !== 'playing';
     zone.tabIndex = state === 'recording' ? 0 : -1;
     letters.forEach((letter, i) => {
-      letter.classList.toggle('recorded', i < recorder.times.length);
-      letter.style.marginLeft = i === 0 ? '0px' : `${recorder.times.length === 5 ? HelloRhythm.spacingFor(recorder.gaps[i - 1]) : HelloRhythm.SPACING.minimumPx}px`;
+      const bar = recorder.bars[Math.floor(i / 5)], position = i % 5;
+      letter.classList.toggle('recorded', position < bar.times.length);
+      letter.style.marginLeft = position === 0 ? '0px' : `${recorder.complete ? HelloRhythm.spacingFor(bar.gaps[position - 1]) : HelloRhythm.SPACING.minimumPx}px`;
     });
-    $('layout-caption').textContent = recorder.times.length === 5
+    $('bar-progress').textContent = recorder.complete ? '4 / 4 마디 기록 완료' : `${Math.min(recorder.completedBars + 1, 4)} / 4 마디 · 완료 ${recorder.completedBars}개`;
+    $('layout-caption').textContent = recorder.complete
       ? '긴 입력 간격은 넓은 여백으로. 넘치는 글자는 좌우로 스크롤해 보세요.'
       : '입력 중에는 같은 간격으로, 완료 후에는 당신의 간격으로.';
-    $('letters').setAttribute('aria-label', `${recorder.times.length} / 5 글자 입력`);
-    $('results').hidden = recorder.times.length !== 5;
+    $('letters').setAttribute('aria-label', `${recorder.completedBars} / 4 마디 완료, ${recorder.current.times.length} / 5 글자 입력${recorder.current.times.length === 5 && !recorder.complete ? ', Enter 대기' : ''}`);
+    $('results').hidden = !recorder.complete;
     if (message) $('feedback').textContent = message;
-    if (recorder.times.length === 5) {
-      const number = ms => `${ms.toFixed(1)}<small>ms</small>`;
-      recorder.gaps.forEach((gap, i) => { $(`gap-${i}`).innerHTML = number(gap); });
-      $('total').innerHTML = number(recorder.relative[4]);
+    if (recorder.complete) {
+      const cell = text => { const td = document.createElement('td'); td.textContent = text; return td; };
+      $('bar-metrics').replaceChildren(...recorder.bars.map((bar, index) => {
+        const row = document.createElement('tr');
+        row.append(cell(`${index + 1}마디`), ...[...bar.gaps, bar.loopGapMs, bar.durationMs].map(ms => cell(ms.toFixed(1))));
+        return row;
+      }));
+      $('total').textContent = `${recorder.durationMs.toFixed(1)} ms`;
     }
   }
   function reset(message, start = false) {
@@ -47,8 +53,8 @@
   function cancelAttempt() {
     if (state === 'recording') reset('입력 영역의 포커스가 사라져 기록을 취소했습니다. ‘입력 시작’을 눌러 다시 입력해 주세요.');
   }
-  $('start').addEventListener('click', () => reset('자연스러운 속도로 hello를 입력해 주세요.', true));
-  $('reset').addEventListener('click', () => reset('새로운 리듬을 기록합니다. hello를 입력해 주세요.', true));
+  $('start').addEventListener('click', () => reset('1마디: hello를 입력한 뒤 Enter를 눌러 주세요. 총 네 번 기록합니다.', true));
+  $('reset').addEventListener('click', () => reset('네 마디를 새로 기록합니다. 1마디의 hello → Enter부터 입력해 주세요.', true));
   zone.addEventListener('keydown', event => {
     if (state !== 'recording' || document.activeElement !== zone) return;
     // Tab retains native keyboard navigation; leaving the zone cancels this attempt.
@@ -59,11 +65,13 @@
       ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey }, performance.now());
     if (result === 'complete') {
       state = 'complete';
-      render('기록을 마쳤습니다. ‘리듬 듣기’로 당신의 간격을 들어보세요.');
-    } else if (result === 'accepted') render('자연스러운 속도로 hello를 입력해 주세요.');
+      render('네 마디 기록을 마쳤습니다. ‘리듬 듣기’를 누르면 전체를 반복 재생합니다.');
+    } else if (result === 'bar-complete') render(`${recorder.completedBars}마디 완료. ${recorder.completedBars + 1}마디의 hello → Enter를 입력해 주세요.`);
+    else if (result === 'awaiting-enter') render(`${recorder.completedBars + 1}마디: 원하는 간격을 두고 Enter를 누르면 이 마디가 완료됩니다.`);
+    else if (result === 'accepted') render(`${recorder.completedBars + 1}마디: 자연스러운 속도로 hello를 입력한 뒤 Enter를 눌러 주세요.`);
     else if (result === 'wrong') render(event.key === 'Backspace'
       ? 'Backspace 수정은 지원하지 않습니다. ‘다시 입력하기’를 눌러 주세요.'
-      : `지금은 소문자 ‘${'hello'[recorder.times.length]}’를 입력해 주세요.`);
+      : recorder.current.times.length === 5 ? '이제 Enter를 눌러 이 마디를 완료해 주세요.' : `지금은 소문자 ‘${'hello'[recorder.current.times.length]}’를 입력해 주세요.`);
     else if (result === 'composition') render('조합 입력은 기록하지 않습니다. 영문 입력 모드로 전환해 주세요.');
   });
   zone.addEventListener('keyup', event => recorder.release(event.code));
@@ -81,14 +89,14 @@
     if (state !== 'complete' || player.bank.status !== 'ready') return;
     const request = ++playbackRequest;
     state = 'playing';
-    render('기록한 간격 그대로 다섯 번의 소리를 재생합니다.');
+    render('네 마디 전체를 반복 재생합니다. 각 마디의 o → Enter 간격을 유지합니다. ‘정지’를 누르면 멈춥니다.');
     try {
       await player.play(recorder.relative, () => {
         if (request !== playbackRequest) return;
         state = 'complete';
         visual.stop();
         render('재생을 마쳤습니다. 같은 리듬을 다시 들을 수 있습니다.');
-      });
+      }, { loop: true, loopGapMs: recorder.loopGapMs });
       if (request === playbackRequest && player.playing) visual.start(player);
     } catch (error) {
       if (request !== playbackRequest) return;
@@ -120,7 +128,7 @@
   }
   $('retry-sounds').addEventListener('click', loadSounds);
   // Font fallback never blocks recording or sound playback.
-  document.fonts.load('500 116px "Bodoni Moda"', 'hello').then(faces => {
+  document.fonts.load('500 76px "Bodoni Moda"', 'hello').then(faces => {
     $('font-status').textContent = faces.length ? 'Bodoni Moda' : '대체 세리프 폰트 사용 중';
   }).catch(() => { $('font-status').textContent = '폰트 로딩 실패 · 대체 세리프 폰트 사용 중'; });
   render();

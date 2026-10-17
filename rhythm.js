@@ -1,9 +1,9 @@
 /* Shared timing logic: no DOM, no sound during recording. */
 (() => {
   'use strict';
-  class Recorder {
+  class BarRecorder {
     constructor() { this.reset(); }
-    reset() { this.times = []; this.held = new Set(); this.active = false; }
+    reset() { this.times = []; this.enterTime = null; this.held = new Set(); this.active = false; }
     start() { this.reset(); this.active = true; }
     release(code) { this.held.delete(code); }
     keydown(event, now) {
@@ -11,13 +11,59 @@
       if (event.repeat || this.held.has(event.code)) return 'repeat';
       this.held.add(event.code);
       if (event.isComposing || event.keyCode === 229) return 'composition';
-      if (event.ctrlKey || event.metaKey || event.altKey || event.key !== 'hello'[this.times.length]) return 'wrong';
+      const expected = this.times.length === 5 ? 'Enter' : 'hello'[this.times.length];
+      if (event.ctrlKey || event.metaKey || event.altKey || event.key !== expected) return 'wrong';
+      if (expected === 'Enter') {
+        this.enterTime = now;
+        this.active = false;
+        return 'complete';
+      }
       this.times.push(now);
-      if (this.times.length === 5) this.active = false;
-      return this.active ? 'accepted' : 'complete';
+      return this.times.length === 5 ? 'awaiting-enter' : 'accepted';
     }
     get relative() { return this.times.map(t => t - this.times[0]); }
     get gaps() { return this.times.slice(1).map((t, i) => t - this.times[i]); }
+    get complete() { return this.enterTime !== null; }
+    get loopGapMs() { return this.complete ? this.enterTime - this.times[4] : null; }
+    get durationMs() { return this.complete ? this.enterTime - this.times[0] : null; }
+  }
+
+  class Recorder {
+    constructor() { this.reset(); }
+    reset() {
+      this.bars = Array.from({ length: 4 }, () => new BarRecorder());
+      this.completedBars = 0;
+      this.held = new Set();
+      this.active = false;
+    }
+    start() {
+      this.reset();
+      this.active = true;
+      this.bars.forEach(bar => { bar.start(); bar.held = this.held; });
+    }
+    get current() { return this.bars[Math.min(this.completedBars, 3)]; }
+    release(code) { this.held.delete(code); }
+    keydown(event, now) {
+      if (!this.active) return 'inactive';
+      const result = this.current.keydown(event, now);
+      if (result !== 'complete') return result;
+      this.completedBars++;
+      this.active = this.completedBars < 4;
+      return this.active ? 'bar-complete' : 'complete';
+    }
+    get complete() { return this.completedBars === 4; }
+    get times() { return this.bars.flatMap(bar => bar.times); }
+    get relative() {
+      if (!this.complete) return [];
+      let offset = 0;
+      return this.bars.flatMap(bar => {
+        const times = bar.relative.map(time => offset + time);
+        offset += bar.durationMs;
+        return times;
+      });
+    }
+    get loopGapMs() { return this.complete ? this.bars[3].loopGapMs : null; }
+    get durationMs() { return this.complete ? this.bars.reduce((total, bar) => total + bar.durationMs, 0) : null; }
   }
 
   // One shared scale for every recording. Never normalize to available width.
@@ -98,7 +144,7 @@
   }
 
   class RhythmPlayer {
-    constructor(makeContext = () => new (window.AudioContext || window.webkitAudioContext)(), bank = new SampleBank()) {
+    constructor(makeContext = () => new (window.AudioContext || window.webkitAudioContext)(), bank = new SampleBank(), timers = globalThis) {
       this.makeContext = makeContext;
       this.bank = bank;
       this.context = null;
@@ -106,11 +152,17 @@
       this.events = [];
       this.generation = 0;
       this.playing = false;
+      this.timers = timers;
+      this.loopTimer = null;
+      this.looping = false;
     }
-    async play(relative, onComplete) {
+    async play(relative, onComplete, { loop = false, loopGapMs } = {}) {
       this.stop();
       const generation = this.generation;
       if (this.bank.status !== 'ready') throw new Error('음원 준비가 완료되지 않았습니다.');
+      if (loop && (!Number.isFinite(loopGapMs) || loopGapMs < 0 || relative.at(-1) + loopGapMs <= 0)) {
+        throw new Error('Enter까지의 입력 시간이 필요합니다. 다시 입력해 주세요.');
+      }
       this.playing = true;
       try {
         // Called synchronously from the user's click, before any await.
@@ -119,11 +171,13 @@
         if (generation !== this.generation) return;
         if (this.context.state !== 'running') throw new Error('오디오 장치를 사용할 수 없습니다.');
         const start = this.context.currentTime + 0.06;
+        this.looping = loop;
+        const scheduleCycle = cycleStart => {
         for (const [index, ms] of relative.entries()) {
-          const letter = 'hello'[index];
+          const letter = 'hello'[index % 5];
           const source = this.context.createBufferSource();
           const gain = this.context.createGain();
-          const at = start + ms / 1000;
+          const at = cycleStart + ms / 1000;
           source.buffer = this.bank.buffers.get(letter);
           const voice = { source, gain };
           this.voices.add(voice);
@@ -133,7 +187,7 @@
           gain.connect(this.context.destination);
           source.onended = () => {
             source.disconnect(); gain.disconnect(); this.voices.delete(voice);
-            if (this.voices.size === 0 && generation === this.generation) {
+            if (!this.looping && this.voices.size === 0 && generation === this.generation) {
               this.playing = false;
               this.events = [];
               onComplete();
@@ -141,6 +195,25 @@
           };
           // Every hit has its own source; never choke previous hits (including l).
           source.start(at);
+        }
+        };
+        scheduleCycle(start);
+        if (loop) {
+          this.loopPeriod = (relative.at(-1) + loopGapMs) / 1000;
+          let nextCycle = 1;
+          const queue = () => {
+            if (generation !== this.generation || !this.playing) return;
+            const now = this.context.currentTime;
+            this.events = this.events.filter(event => event.at + 0.12 > now);
+            // A delayed/background timer must not burst overdue patterns or
+            // move the grid: recover at the next cycle on the original clock.
+            nextCycle = Math.max(nextCycle, Math.ceil((now + 0.01 - start) / this.loopPeriod));
+            while (start + nextCycle * this.loopPeriod < now + 0.2) {
+              scheduleCycle(start + nextCycle * this.loopPeriod);
+              nextCycle++;
+            }
+          };
+          this.loopTimer = this.timers.setInterval(queue, 25);
         }
       } catch (error) {
         if (generation !== this.generation) return;
@@ -151,6 +224,9 @@
     stop() {
       this.generation++;
       this.playing = false;
+      this.looping = false;
+      if (this.loopTimer !== null) this.timers.clearInterval(this.loopTimer);
+      this.loopTimer = null;
       this.events = [];
       for (const { source, gain } of this.voices) {
         source.onended = null;
@@ -189,5 +265,5 @@
       this.elements.forEach(element => element.classList.remove('sounding'));
     }
   }
-  globalThis.HelloRhythm = { Recorder, RhythmPlayer, SampleBank, PlaybackVisual, SPACING, INSTRUMENTS, spacingFor, activeIndices, embeddedBytes };
+  globalThis.HelloRhythm = { Recorder, BarRecorder, RhythmPlayer, SampleBank, PlaybackVisual, SPACING, INSTRUMENTS, spacingFor, activeIndices, embeddedBytes };
 })();

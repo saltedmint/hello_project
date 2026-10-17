@@ -14,15 +14,16 @@
     <header><span class="eyebrow">A SMALL EXPERIMENT IN TIMING</span><span class="tag">키보드 실험 · 01</span></header>
     <section class="intro">
       <h1>같은 hello,<br>당신만의 리듬.</h1>
-      <p>당신의 속도로 hello를 입력해 주세요.<br>다섯 번의 손끝 사이, 작은 간격을 소리로 들어봅니다.</p>
+      <p>hello → Enter를 네 번 입력해 주세요.<br>당신의 속도로 만든 네 마디를 이어 들어봅니다.</p>
     </section>
     <section class="experiment" aria-label="타이핑 리듬 기록과 재생">
       <div class="panel-top"><span>YOUR KEYSTROKES</span><span id="status" role="status">대기</span></div>
       <div id="input-zone" tabindex="-1" role="group" aria-label="hello 키보드 입력 영역" aria-describedby="hint feedback">
-        <div id="word-scroll" tabindex="0" role="region" aria-label="타이핑 간격 시각화. 폭을 넘으면 좌우로 스크롤할 수 있습니다."><div id="letters" aria-label="0 / 5 글자 입력"><span>h</span><span>e</span><span>l</span><span>l</span><span>o</span></div></div>
-        <span id="layout-caption" class="input-caption">입력 중에는 같은 간격으로, 완료 후에는 당신의 간격으로.</span>
+        <div id="word-scroll" tabindex="0" role="region" aria-label="타이핑 간격 시각화. 폭을 넘으면 좌우로 스크롤할 수 있습니다."><div id="letters" aria-label="0 / 4"><div class="bar-line"><span class="bar-number">01</span><div class="bar-word"><span class="letter">h</span><span class="letter">e</span><span class="letter">l</span><span class="letter">l</span><span class="letter">o</span></div></div><div class="bar-line"><span class="bar-number">02</span><div class="bar-word"><span class="letter">h</span><span class="letter">e</span><span class="letter">l</span><span class="letter">l</span><span class="letter">o</span></div></div><div class="bar-line"><span class="bar-number">03</span><div class="bar-word"><span class="letter">h</span><span class="letter">e</span><span class="letter">l</span><span class="letter">l</span><span class="letter">o</span></div></div><div class="bar-line"><span class="bar-number">04</span><div class="bar-word"><span class="letter">h</span><span class="letter">e</span><span class="letter">l</span><span class="letter">l</span><span class="letter">o</span></div></div></div></div>
+        <span id="bar-progress" class="input-caption" role="status">1 / 4 마디 · 완료 0개</span>
+        <span id="layout-caption" class="input-caption">입력 중에는 같은 간격으로, 네 마디 완료 후에는 당신의 간격으로.</span>
       </div>
-      <p id="hint">영문 입력 모드에서 소문자로 입력해 주세요. 수정은 ‘다시 입력하기’로 합니다.</p>
+      <p id="hint">영문 소문자 hello → Enter를 네 번 입력합니다. 각 마디의 o → Enter가 다음 마디까지의 간격이 됩니다.</p>
       <p id="feedback" aria-live="polite">준비되면 ‘입력 시작’을 눌러 주세요.</p>
       <div class="asset-info"><span id="sound-status" role="status">음원 준비 중…</span><button id="retry-sounds" hidden>음원 다시 불러오기</button><span id="font-status" role="status">폰트 준비 중…</span></div>
       <p class="instrument-key">h · 킥 <span>e · 스네어</span><span>l · 닫힌 하이햇</span><span>o · 톰</span></p>
@@ -33,14 +34,8 @@
         <button id="reset" class="quiet">다시 입력하기 <span aria-hidden="true">↺</span></button>
       </div>
       <div id="results" hidden>
-        <div class="result-heading"><span>글자 사이 간격</span><span>첫 h를 기준으로 기록</span></div>
-        <div class="metrics">
-          <div><span>h → e</span><strong id="gap-0"></strong></div>
-          <div><span>e → l</span><strong id="gap-1"></strong></div>
-          <div><span>l → l</span><strong id="gap-2"></strong></div>
-          <div><span>l → o</span><strong id="gap-3"></strong></div>
-          <div class="total"><span>전체 입력 소요</span><strong id="total"></strong></div>
-        </div>
+        <div class="result-heading"><span>마디별 입력 간격 · ms</span><span>네 마디 루프 <strong id="total"></strong></span></div>
+        <div class="table-scroll"><table><thead><tr><th>마디</th><th>h → e</th><th>e → l</th><th>l → l</th><th>l → o</th><th>o → Enter</th><th>마디 길이</th></tr></thead><tbody id="bar-metrics"></tbody></table></div>
       </div>
     </section>
     <footer><span>입력은 조용하게. 재생은 있는 그대로.</span><span>HELLO / RHYTHM</span></footer>

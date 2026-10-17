@@ -28,9 +28,15 @@ window.addEventListener('load', async () => {
     const $ = id => document.getElementById(id);
     await until(() => $('sound-status').textContent.includes('완료'));
     $('start').click();
-    for (const letter of 'hello') {
+    for (let bar = 0; bar < 4; bar++) {
+      for (const letter of 'hello') {
+        for (const type of ['keydown', 'keyup']) $('input-zone').dispatchEvent(new KeyboardEvent(type,
+          { key: letter, code: `Key${letter.toUpperCase()}`, bubbles: true, cancelable: true }));
+      }
+      assert($('play').disabled && $('status').textContent === '입력 중');
       for (const type of ['keydown', 'keyup']) $('input-zone').dispatchEvent(new KeyboardEvent(type,
-        { key: letter, code: `Key${letter.toUpperCase()}`, bubbles: true, cancelable: true }));
+        { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }));
+      if (bar < 3) assert($('play').disabled && $('status').textContent === '입력 중');
     }
     assert(!$('play').disabled && $('status').textContent === '입력 완료');
     $('play').click(); await Promise.resolve(); await Promise.resolve();
@@ -39,7 +45,7 @@ window.addEventListener('load', async () => {
     $('stop').click(); assert(!$('play').disabled);
     $('play').click(); await Promise.resolve(); $('reset').click();
     assert($('status').textContent === '입력 중' && $('results').hidden);
-    assert([...$('letters').children].every(el => !el.classList.contains('sounding')));
-    report.textContent = 'PASS file://: no fetch, 4 decoded drums, real offline render, input, play, stop, replay, reset';
+    assert([...$('letters').querySelectorAll('.letter')].every(el => !el.classList.contains('sounding')));
+    report.textContent = 'PASS file://: no fetch, 4 decoded drums, real offline render, four bars, play, stop, replay, reset';
   } catch (error) { report.textContent = `FAIL file://: ${error.stack}`; }
 });
