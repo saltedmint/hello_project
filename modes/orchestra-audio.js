@@ -1,71 +1,6 @@
 /* Shared timing logic: no DOM, no sound during recording. */
 (() => {
   'use strict';
-  class BarRecorder {
-    constructor() { this.reset(); }
-    reset() { this.times = []; this.enterTime = null; this.held = new Set(); this.active = false; }
-    start() { this.reset(); this.active = true; }
-    release(code) { this.held.delete(code); }
-    keydown(event, now) {
-      if (!this.active) return 'inactive';
-      if (event.repeat || this.held.has(event.code)) return 'repeat';
-      this.held.add(event.code);
-      if (event.isComposing || event.keyCode === 229) return 'composition';
-      const expected = this.times.length === 5 ? 'Enter' : 'hello'[this.times.length];
-      if (event.ctrlKey || event.metaKey || event.altKey || event.key !== expected) return 'wrong';
-      if (expected === 'Enter') {
-        this.enterTime = now;
-        this.active = false;
-        return 'complete';
-      }
-      this.times.push(now);
-      return this.times.length === 5 ? 'awaiting-enter' : 'accepted';
-    }
-    get relative() { return this.times.map(t => t - this.times[0]); }
-    get gaps() { return this.times.slice(1).map((t, i) => t - this.times[i]); }
-    get complete() { return this.enterTime !== null; }
-    get loopGapMs() { return this.complete ? this.enterTime - this.times[4] : null; }
-    get durationMs() { return this.complete ? this.enterTime - this.times[0] : null; }
-  }
-
-  class Recorder {
-    constructor() { this.reset(); }
-    reset() {
-      this.bars = Array.from({ length: 4 }, () => new BarRecorder());
-      this.completedBars = 0;
-      this.held = new Set();
-      this.active = false;
-    }
-    start() {
-      this.reset();
-      this.active = true;
-      this.bars.forEach(bar => { bar.start(); bar.held = this.held; });
-    }
-    get current() { return this.bars[Math.min(this.completedBars, 3)]; }
-    release(code) { this.held.delete(code); }
-    keydown(event, now) {
-      if (!this.active) return 'inactive';
-      const result = this.current.keydown(event, now);
-      if (result !== 'complete') return result;
-      this.completedBars++;
-      this.active = this.completedBars < 4;
-      return this.active ? 'bar-complete' : 'complete';
-    }
-    get complete() { return this.completedBars === 4; }
-    get times() { return this.bars.flatMap(bar => bar.times); }
-    get relative() {
-      if (!this.complete) return [];
-      let offset = 0;
-      return this.bars.flatMap(bar => {
-        const times = bar.relative.map(time => offset + time);
-        offset += bar.durationMs;
-        return times;
-      });
-    }
-    get loopGapMs() { return this.complete ? this.bars[3].loopGapMs : null; }
-    get durationMs() { return this.complete ? this.bars.reduce((total, bar) => total + bar.durationMs, 0) : null; }
-  }
-
   // One shared scale for every recording. Never normalize to available width.
   const SPACING = Object.freeze({ minimumPx: 12, pixelsPerMs: 0.12 });
   const INSTRUMENTS = Object.freeze({
@@ -191,7 +126,7 @@
   }
 
   class RhythmPlayer {
-    constructor(makeContext = () => new (window.AudioContext || window.webkitAudioContext)(), bank = new SampleBank(), timers = globalThis) {
+    constructor(makeContext = HelloAudio.createContext, bank = new SampleBank(), timers = globalThis) {
       this.makeContext = makeContext;
       this.bank = bank;
       this.context = null;
@@ -220,7 +155,8 @@
       try {
         // Called synchronously from the user's click, before any await.
         this.context ||= this.makeContext();
-        if (this.context.state === 'suspended') await this.context.resume();
+        const resumed = HelloAudio.ensureRunning(this.context);
+        if (resumed) await resumed;
         if (generation !== this.generation) return;
         if (this.context.state !== 'running') throw new Error('오디오 장치를 사용할 수 없습니다.');
         const eventList = buildEvents(relative, melody);
@@ -280,13 +216,7 @@
       if (this.loopTimer !== null) this.timers.clearInterval(this.loopTimer);
       this.loopTimer = null;
       this.events = [];
-      for (const { source, gain } of this.voices) {
-        source.onended = null;
-        gain.disconnect();
-        source.stop(this.context.currentTime);
-        source.disconnect();
-      }
-      this.voices.clear();
+      HelloAudio.stopVoices(this.voices, this.context);
       if (this.melodyGain) this.melodyGain.disconnect(); this.melodyGain = null;
     }
   }
@@ -318,5 +248,5 @@
       this.elements.forEach(element => element.classList.remove('sounding'));
     }
   }
-  globalThis.HelloRhythm = { Recorder, BarRecorder, RhythmPlayer, SampleBank, PlaybackVisual, SPACING, INSTRUMENTS, spacingFor, activeIndices, embeddedBytes, buildEvents, scheduleEvents, SYNTH, PLAYBACK_LEAD_SECONDS };
+  globalThis.HelloRhythm = { ...HelloTyping, RhythmPlayer, SampleBank, PlaybackVisual, SPACING, INSTRUMENTS, spacingFor, activeIndices, embeddedBytes, buildEvents, scheduleEvents, SYNTH, PLAYBACK_LEAD_SECONDS };
 })();

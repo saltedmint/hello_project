@@ -400,6 +400,7 @@
   failureFrame.remove();
   await runHandwritingTests({ check, assert, same, realBank, fakeAudio, frame, uiAudio, type });
   await runWavTests({ check, assert, same, realBank, fourRecord, fakeAudio, frame, uiAudio, type });
+  await runRecordingTests({ check, assert, same, fourRecord });
   report.textContent = `${lines.join('\n')}\n\n${lines.length - failed}/${lines.length} passed`;
   report.dataset.result = failed ? 'fail' : 'pass';
 })().catch(error => {
