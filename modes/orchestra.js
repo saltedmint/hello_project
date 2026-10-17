@@ -1,7 +1,13 @@
 (() => {
   'use strict';
   const $ = id => document.getElementById(id);
-  const recorder = new HelloRhythm.Recorder();
+  let recorder = new HelloTyping.Recorder();
+  let active = false;
+  let onRecord = () => {};
+  let recordId = HelloRecording.newId();
+  let baseRecord = null;
+  const bindings = [];
+  const listen = (target, type, handler) => bindings.push([target, type, handler]);
   const player = new HelloRhythm.RhythmPlayer();
   const zone = $('input-zone');
   const letters = [...$('letters').querySelectorAll('.letter')];
@@ -69,8 +75,12 @@
       }));
       $('total').textContent = `${recorder.durationMs.toFixed(1)} ms`;
     }
+    if (active && recorder.complete) onRecord(getRecord());
+    if (!active) $('mode-a').querySelectorAll('button, input').forEach(element => { element.disabled = true; });
+    else $('retry-sounds').disabled = false;
   }
   function reset(message, start = false) {
+    recordId = HelloRecording.newId(); baseRecord = null;
     exportGeneration++;
     $('export-status').textContent = '현재 리듬과 완료한 손글씨 선율을 WAV로 저장합니다.';
     playbackRequest++;
@@ -91,7 +101,7 @@
   }
   $('start').addEventListener('click', () => reset('1마디: hello를 입력한 뒤 Enter를 눌러 주세요. 총 네 번 기록합니다.', true));
   $('reset').addEventListener('click', () => reset('네 마디를 새로 기록합니다. 1마디의 hello → Enter부터 입력해 주세요.', true));
-  zone.addEventListener('keydown', event => {
+  listen(zone, 'keydown', event => {
     if (state !== 'recording' || document.activeElement !== zone) return;
     // Tab retains native keyboard navigation; leaving the zone cancels this attempt.
     if (event.key === 'Tab') return;
@@ -110,21 +120,21 @@
       : recorder.current.times.length === 5 ? '이제 Enter를 눌러 이 마디를 완료해 주세요.' : `지금은 소문자 ‘${'hello'[recorder.current.times.length]}’를 입력해 주세요.`);
     else if (result === 'composition') render('조합 입력은 기록하지 않습니다. 영문 입력 모드로 전환해 주세요.');
   });
-  zone.addEventListener('keyup', event => recorder.release(event.code));
-  zone.addEventListener('compositionstart', () => { composing = true; });
-  zone.addEventListener('compositionend', () => { composing = false; });
-  zone.addEventListener('paste', event => {
+  listen(zone, 'keyup', event => recorder.release(event.code));
+  listen(zone, 'compositionstart', () => { composing = true; });
+  listen(zone, 'compositionend', () => { composing = false; });
+  listen(zone, 'paste', event => {
     event.preventDefault();
     if (state === 'recording') render('붙여넣기는 기록하지 않습니다. 키보드로 직접 입력해 주세요.');
   });
-  zone.addEventListener('beforeinput', event => event.preventDefault());
-  zone.addEventListener('blur', cancelAttempt);
+  listen(zone, 'beforeinput', event => event.preventDefault());
+  listen(zone, 'blur', cancelAttempt);
   const leave = () => { cancelAttempt(); handwriting.cancelActive(); if (state === 'playing') stopPlayback('화면을 벗어나 재생을 정지했습니다. 다시 들을 수 있습니다.'); };
-  window.addEventListener('blur', leave);
-  window.addEventListener('pagehide', leave);
-  document.addEventListener('visibilitychange', () => { if (document.hidden) leave(); });
+  listen(window, 'blur', leave);
+  listen(window, 'pagehide', leave);
+  listen(document, 'visibilitychange', () => { if (document.hidden) leave(); });
   async function playRecording(withMelody = false) {
-    if (exporting || state !== 'complete' || player.bank.status !== 'ready') return;
+    if (!active || exporting || state !== 'complete' || player.bank.status !== 'ready') return;
     if (withMelody && !handwriting.melody) return;
     const request = ++playbackRequest;
     state = 'playing';
@@ -183,9 +193,10 @@
   $('melody-volume').addEventListener('input', event => {
     player.setMelodyVolume(Number(event.target.value) / 100 * .15);
     $('melody-volume-value').textContent = `${event.target.value}%`;
+    render();
   });
   async function exportWav(repeated) {
-    if (exporting || !recorder.complete) return;
+    if (!active || exporting || !recorder.complete) return;
     if (player.bank.status !== 'ready') { $('export-status').textContent = '음원 준비가 끝난 뒤 다시 다운로드해 주세요.'; return; }
     exporting = true;
     const generation = ++exportGeneration;
@@ -226,6 +237,48 @@
   document.fonts.load('500 76px "Bodoni Moda"', 'hello').then(faces => {
     $('font-status').textContent = faces.length ? 'Bodoni Moda' : '대체 세리프 폰트 사용 중';
   }).catch(() => { $('font-status').textContent = '폰트 로딩 실패 · 대체 세리프 폰트 사용 중'; });
-  render();
-  loadSounds();
+  function getRecord() {
+    const result = HelloOrchestraData.capture(recorder, recordId, handwriting, player.melodyVolume);
+    if (result && baseRecord) {
+      result.source = baseRecord.source;
+      if (!baseRecord.raw) delete result.raw;
+    }
+    return result;
+  }
+  function applyRecord(prepared) {
+    // prepare() validates and constructs everything before this changes live state.
+    exportGeneration++; stopPlayback(); handwriting.clear();
+    recorder = prepared.recorder; recordId = prepared.record.id; baseRecord = prepared.record;
+    composing = false; state = 'complete';
+    handwriting.recorder.strokes = prepared.strokes;
+    handwriting.melody = prepared.melody; handwriting.locked = !!prepared.melody;
+    handwritingOpen = !!prepared.melody;
+    player.setMelodyVolume(prepared.volume);
+    $('melody-volume').value = Math.round(prepared.volume / .15 * 100);
+    $('melody-volume-value').textContent = `${$('melody-volume').value}%`;
+    $('handwriting-status').textContent = prepared.melody ? 'JSON의 원본 필기에서 선율을 복원했습니다. 함께 듣기를 사용할 수 있습니다.' : '원하면 손글씨 선율을 추가해 주세요.';
+    render('JSON에서 네 마디 기록을 불러왔습니다.'); handwriting.draw();
+  }
+  function enter() {
+    if (active) return;
+    active = true;
+    bindings.forEach(([target, type, handler]) => target.addEventListener(type, handler));
+    handwriting.setEnabled(true); render();
+    if (player.bank.status === 'idle') loadSounds();
+    handwriting.draw();
+  }
+  function leaveMode() {
+    if (!active) return;
+    active = false; exportGeneration++;
+    bindings.forEach(([target, type, handler]) => target.removeEventListener(type, handler));
+    handwriting.setEnabled(false); stopPlayback();
+    if (state === 'recording') reset('모드를 전환해 진행 중인 입력을 취소했습니다. 다시 입력할 수 있습니다.');
+    recorder.held.clear(); composing = false;
+  }
+  handwriting.setEnabled(false); render();
+  globalThis.HelloOrchestra = { enter, leave: leaveMode, getRecord, applyRecord,
+    prepareImport: HelloOrchestraData.prepare, subscribe(callback) { onRecord = callback; },
+    diagnostics: () => ({ active, state, voices: player.voices.size, events: player.events.length,
+      loopTimer: player.loopTimer, letterFrame: visual.frame, handwritingFrame: handwriting.frame,
+      inputBindings: active ? bindings.length : 0, canvasInputEnabled: handwriting.inputEnabled, exporting }) };
 })();

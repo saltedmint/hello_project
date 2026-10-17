@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "id": "example-four-bars-not-a-participant",
+  "text": "hellohellohellohello",
+  "source": "example",
+  "relativeTimesMs": [
+    0,
+    180,
+    420,
+    570,
+    900,
+    1500,
+    1680,
+    1920,
+    2070,
+    2400,
+    3000,
+    3180,
+    3420,
+    3570,
+    3900,
+    4500,
+    4680,
+    4920,
+    5070,
+    5400
+  ],
+  "durationMs": 5400,
+  "raw": {
+    "clock": "performance.now",
+    "keyDownTimesMs": [
+      1000,
+      1180,
+      1420,
+      1570,
+      1900,
+      2500,
+      2680,
+      2920,
+      3070,
+      3400,
+      4000,
+      4180,
+      4420,
+      4570,
+      4900,
+      5500,
+      5680,
+      5920,
+      6070,
+      6400
+    ],
+    "enterTimesMs": [
+      2200,
+      3700,
+      5200,
+      6700
+    ]
+  },
+  "a": {
+    "bars": [
+      {
+        "endMs": 1200
+      },
+      {
+        "endMs": 1200
+      },
+      {
+        "endMs": 1200
+      },
+      {
+        "endMs": 1200
+      }
+    ]
+  }
+}

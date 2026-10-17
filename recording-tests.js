@@ -15,6 +15,14 @@ globalThis.runRecordingTests = async ({ check, assert, same, fourRecord }) => {
     same(restored.recorder.times, fourRecord.times); same(restored.recorder.relative, fourRecord.relative);
     same(restored.recorder.bars.map(bar => bar.enterTime), fourRecord.bars.map(bar => bar.enterTime));
   });
+  check('공통 JSON: 소수점 원본 시각과 Enter를 재계산으로 덮어쓰지 않음', () => {
+    const fractional = copy(capture);
+    fractional.raw.keyDownTimesMs = fractional.raw.keyDownTimesMs.map(time => time + .1234567);
+    fractional.raw.enterTimesMs = fractional.raw.enterTimesMs.map(time => time + .1234567);
+    const restored = HelloOrchestraData.prepare(fractional).recorder;
+    same(restored.times, fractional.raw.keyDownTimesMs);
+    same(restored.bars.map(bar => bar.enterTime), fractional.raw.enterTimesMs);
+  });
   check('공통 JSON: 최소 필드의 한 hello는 B에서 재사용 가능 · A 전용 메타는 요구하지 않음', () => {
     const basic = { schemaVersion:1, id:'single-hello', text:'hello', relativeTimesMs:[0,180,420,570,900], durationMs:900 };
     assert(HelloRecording.validate(basic).source === 'imported');
@@ -63,5 +71,10 @@ globalThis.runRecordingTests = async ({ check, assert, same, fourRecord }) => {
   check('A 데이터: 잘못된 선택 손글씨도 적용 전에 거부', () => {
     const bad = copy(capture); bad.a.handwriting = { volume:Infinity,strokes:[] };
     let rejected = false; try { HelloOrchestraData.prepare(bad); } catch { rejected = true; } assert(rejected);
+  });
+  const example = HelloRecording.parse(await (await fetch('examples/typing-example.json')).text());
+  check('예시 파일: 실제 참여자 아님을 선언 · 공통/A 스키마 모두 유효', () => {
+    assert(example.source === 'example' && example.id.includes('not-a-participant'));
+    assert(HelloOrchestraData.prepare(example).recorder.durationMs === 4800);
   });
 };

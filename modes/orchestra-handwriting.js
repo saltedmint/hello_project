@@ -86,33 +86,42 @@
   class HandwritingCanvas {
     constructor(canvas, onEdit) {
       this.canvas = canvas; this.onEdit = onEdit; this.recorder = new HandwritingRecorder();
+      this.bindings = []; this.inputEnabled = false;
+      this.listen = (type, handler) => this.bindings.push([type, handler]);
       this.pointerId = null; this.locked = false; this.melody = null; this.frame = null;
       this.generation = 0;
       const position = event => {
         const rect = canvas.getBoundingClientRect();
         return [(event.clientX - rect.left) / rect.width, (event.clientY - rect.top) / rect.height, performance.now()];
       };
-      canvas.addEventListener('pointerdown', event => {
+      this.listen('pointerdown', event => {
         if (this.locked || this.pointerId !== null || event.button !== 0 || !event.isPrimary) return;
         event.preventDefault(); this.onEdit(); this.melody = null;
         this.pointerId = event.pointerId; canvas.setPointerCapture(event.pointerId);
         this.recorder.down(...position(event)); this.draw();
       });
-      canvas.addEventListener('pointermove', event => {
+      this.listen('pointermove', event => {
         if (event.pointerId !== this.pointerId) return;
         event.preventDefault(); this.recorder.move(...position(event)); this.draw();
       });
-      canvas.addEventListener('pointerup', event => {
+      this.listen('pointerup', event => {
         if (event.pointerId !== this.pointerId) return;
         this.recorder.up(...position(event)); this.pointerId = null;
         if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
         this.draw();
       });
       const cancel = () => { if (this.pointerId !== null) { this.recorder.cancel(); this.pointerId = null; this.draw(); } };
-      canvas.addEventListener('pointercancel', cancel);
-      canvas.addEventListener('lostpointercapture', cancel);
+      this.listen('pointercancel', cancel);
+      this.listen('lostpointercapture', cancel);
       this.resize = new ResizeObserver(() => this.draw()); this.resize.observe(canvas);
-      this.draw();
+      this.setEnabled(true); this.draw();
+    }
+    setEnabled(enabled) {
+      if (this.inputEnabled === enabled) return;
+      this.inputEnabled = enabled;
+      for (const [type, handler] of this.bindings) this.canvas[enabled ? 'addEventListener' : 'removeEventListener'](type, handler);
+      if (enabled) this.resize.observe(this.canvas);
+      else { this.cancelActive(); this.stop(); this.resize.disconnect(); }
     }
     draw(cursor = null) {
       const rect = this.canvas.getBoundingClientRect(); if (!rect.width || !rect.height) return;

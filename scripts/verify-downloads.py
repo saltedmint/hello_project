@@ -33,6 +33,7 @@ SCRIPT = """<script>window.addEventListener('load',async()=>{
 const $=id=>document.getElementById(id);
 const wait=async test=>{for(let i=0;i<1000;i++){if(test())return;await new Promise(r=>setTimeout(r,10));}throw Error('timeout: '+$('export-status').textContent+' / '+$('sound-status').textContent);};
 try{
+  $('choose-a').click();
   await wait(()=>$('sound-status').textContent.includes('완료'));
   window.AudioContext=function(){throw Error('export must stay offline');};
   let now=1000;Object.defineProperty(performance,'now',{configurable:true,value:()=>now});$('start').click();
@@ -47,6 +48,7 @@ try{
   }
   $('finish-writing').click();delete performance.now;
   $('melody-volume').value='30';$('melody-volume').dispatchEvent(new Event('input'));
+  $('save-json').click();
   for(const id of ['download-original','download-repeated']){
     $(id).click();await wait(()=>$('export-status').textContent.includes('준비 완료')||$('export-status').textContent.includes('실패'));
     if($('export-status').textContent.includes('실패'))throw Error($('export-status').textContent);
@@ -85,6 +87,15 @@ def run():
                         break
                     time.sleep(.05)
                 print(reports[0])
+                json_files = list(downloads.glob('*.json'))
+                assert len(json_files) == 1
+                saved = json.loads(json_files[0].read_text(encoding='utf-8'))
+                assert saved['schemaVersion'] == 1 and saved['text'] == 'hello' * 4
+                assert len(saved['relativeTimesMs']) == 20 and saved['durationMs'] == 6900
+                assert saved['relativeTimesMs'][5] == 2000 and len(saved['raw']['keyDownTimesMs']) == 20
+                assert len(saved['a']['handwriting']['strokes']) == 2
+                assert abs(saved['a']['handwriting']['volume'] - .045) < .000001
+                print('PASS actual JSON download: original times, four bars, handwriting, and volume preserved')
                 for name, expected in [("greeting-original.wav", 5.66), ("greeting-repeated.wav", 15.66)]:
                     with wave.open(str(downloads / name), "rb") as audio:
                         pcm = array.array("h", audio.readframes(audio.getnframes()))

@@ -307,6 +307,7 @@
   if (frame.contentDocument.readyState !== 'complete') await new Promise(resolve => frame.addEventListener('load', resolve, { once: true }));
   const w = frame.contentWindow, d = frame.contentDocument;
   const $ = id => d.getElementById(id);
+  $('choose-a').click();
   async function until(condition) {
     for (let i = 0; i < 500; i++) { if (condition()) return; await new Promise(resolve => setTimeout(resolve, 10)); }
     throw new Error('UI timeout');
@@ -388,6 +389,7 @@
   document.body.append(failureFrame);
   await new Promise(resolve => failureFrame.addEventListener('load', resolve, { once: true }));
   const fw = failureFrame.contentWindow, fd = failureFrame.contentDocument;
+  fd.getElementById('choose-a').click();
   await until(() => !fd.getElementById('retry-sounds').hidden && fd.getElementById('font-status').textContent.includes('실패'));
   check('UI: 실제 음원 실패 안내·재시도 표시 · 폰트 404 시 대체 세리프', () => {
     assert(fd.getElementById('sound-status').textContent.includes('503'));
@@ -401,6 +403,7 @@
   await runHandwritingTests({ check, assert, same, realBank, fakeAudio, frame, uiAudio, type });
   await runWavTests({ check, assert, same, realBank, fourRecord, fakeAudio, frame, uiAudio, type });
   await runRecordingTests({ check, assert, same, fourRecord });
+  await runModeTests({ check, assert, same, fourRecord, frame, uiAudio, type });
   report.textContent = `${lines.join('\n')}\n\n${lines.length - failed}/${lines.length} passed`;
   report.dataset.result = failed ? 'fail' : 'pass';
 })().catch(error => {

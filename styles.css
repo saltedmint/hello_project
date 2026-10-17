@@ -3,6 +3,30 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: #f3f4ed; color: var(--ink); font-family: "Segoe UI", "Malgun Gothic", sans-serif; }
 main { max-width: 1060px; margin: 0 auto; padding: 36px 48px 28px; }
+[hidden] { display: none !important; }
+.mode-home { padding: 46px 0 26px; }
+.mode-home h1 { margin: 18px 0; }
+.mode-home > p, .mode-cards p, .soundscape-entry p { color: var(--muted); font-size: 14px; line-height: 1.9; }
+.mode-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 30px; }
+.mode-cards article { background: #fffef9; border: 1px solid var(--line); border-radius: 14px; padding: 28px; }
+.mode-letter { font-family: Georgia, serif; font-size: 36px; color: var(--green); }
+.mode-cards h2 { margin: 10px 0; font-size: 22px; font-weight: 500; }
+.mode-cards button { margin-top: 12px; }
+.pending-badge { display: inline-block; background: #ece9dd; color: #726748; border-radius: 20px; padding: 6px 11px; font-size: 11px; margin-right: 10px; }
+#mode-nav { margin-top: 20px; }
+#mode-nav button { margin-right: 6px; }
+#mode-nav [aria-current="page"] { background: var(--green); color: white; }
+.record-tools { border: 1px solid var(--line); border-radius: 10px; padding: 17px 20px; margin-top: 24px; background: #f9faf4; }
+.record-tools strong { font-size: 13px; font-weight: 500; }
+#record-summary { display: block; font-size: 11px; color: var(--muted); margin-top: 7px; overflow-wrap: anywhere; }
+.record-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
+.record-actions a { color: var(--green); font-size: 11px; }
+#json-status { font-size: 11px; line-height: 1.7; color: var(--muted); margin: 10px 0 0; }
+.soundscape-entry { padding: 44px 0; }
+.soundscape-entry h1 { margin: 20px 0; font-size: 36px; }
+.soundscape-entry h2 { font-size: 16px; font-weight: 500; margin-top: 30px; }
+#b-records { padding-left: 20px; font-size: 12px; line-height: 2; overflow-wrap: anywhere; }
+@media (max-width: 700px) { .mode-cards { grid-template-columns: 1fr; } }
 header, footer { display: flex; justify-content: space-between; gap: 20px; align-items: center; }
 header { padding-bottom: 23px; border-bottom: 1px solid var(--line); }
 .eyebrow, .tag, footer { font-size: 11px; letter-spacing: .12em; }

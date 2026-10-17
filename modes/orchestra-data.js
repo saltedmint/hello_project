@@ -23,8 +23,10 @@
       const wordLength = bar.times[4] - bar.times[0];
       if (!Number.isFinite(end) || end < wordLength || end > 3600000) throw new Error('마디의 Enter 시각은 마지막 o 뒤여야 합니다.');
       bar.enterTime = bar.times[0] + end;
-      if (index < 3 && bar.enterTime > original[offset + 5]) throw new Error('마디 종료는 다음 마디 첫 h보다 늦을 수 없습니다.');
       if (record.raw?.enterTimesMs && (record.raw.enterTimesMs.length !== 4 || !HelloRecording.near(bar.enterTime, record.raw.enterTimesMs[index]))) throw new Error('Enter 원본 시각과 마디 정보가 다릅니다.');
+      if (record.raw?.enterTimesMs) bar.enterTime = record.raw.enterTimesMs[index];
+      if (bar.enterTime < bar.times[4]) throw new Error('Enter 원본 시각은 마지막 o 뒤여야 합니다.');
+      if (index < 3 && bar.enterTime > original[offset + 5]) throw new Error('마디 종료는 다음 마디 첫 h보다 늦을 수 없습니다.');
     }
     recorder.completedBars = 4;
     let strokes = [], melody = null, volume = .07;

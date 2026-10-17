@@ -26,6 +26,7 @@ window.addEventListener('load', async () => {
     const pcm = (await offline.startRendering()).getChannelData(0);
     assert(pcm.some(value => Math.abs(value) > .1));
     const $ = id => document.getElementById(id);
+    $('choose-a').click();
     await until(() => $('sound-status').textContent.includes('완료'));
     $('start').click();
     for (let bar = 0; bar < 4; bar++) {
