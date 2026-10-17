@@ -9,12 +9,44 @@
   let state = 'waiting';
   let composing = false;
   let playbackRequest = 0;
+  let handwritingOpen = false;
+  let exporting = false;
+  let exportGeneration = 0;
+  const handwriting = new HelloHandwriting.HandwritingCanvas($('handwriting-canvas'), () => {
+    stopPlayback();
+    $('handwriting-status').textContent = '필기를 기록 중입니다. 여러 획을 쓴 뒤 ‘쓰기 완료’를 눌러 주세요.';
+  });
   const labels = { waiting: '대기', recording: '입력 중', complete: '입력 완료', playing: '재생 중' };
   function render(message) {
     $('status').textContent = labels[state];
     $('start').disabled = state !== 'waiting';
-    $('play').disabled = state !== 'complete' || player.bank.status !== 'ready';
+    $('play').disabled = exporting || state !== 'complete' || player.bank.status !== 'ready';
     $('stop').disabled = state !== 'playing';
+    $('stop-handwriting').disabled = state !== 'playing';
+    $('add-handwriting').disabled = exporting || state !== 'complete';
+    $('handwriting-panel').hidden = !handwritingOpen || !recorder.complete;
+    $('play-together').disabled = exporting || state !== 'complete' || player.bank.status !== 'ready' || !handwriting.melody;
+    $('finish-writing').disabled = exporting || state === 'playing' || handwriting.locked;
+    $('reset').disabled = exporting;
+    $('clear-writing').disabled = exporting;
+    $('without-melody').disabled = exporting;
+    $('melody-volume').disabled = exporting;
+    $('handwriting-canvas').style.pointerEvents = exporting ? 'none' : '';
+    $('export-panel').hidden = !recorder.complete;
+    const canExport = recorder.complete && player.bank.status === 'ready' && !exporting;
+    $('download-original').disabled = !canExport;
+    $('download-repeated').disabled = !canExport;
+    if (recorder.complete && player.bank.status === 'ready') {
+      for (const [id, repeated] of [['original-estimate', false], ['repeated-estimate', true]]) {
+        try {
+          const plan = HelloWav.planExport({ relative: recorder.relative, melody: handwriting.melody, bank: player.bank, repeated });
+          $(id).textContent = `${plan.hasMelody ? '리듬 + 손글씨 선율' : '리듬만'} · ${plan.count}회 · 파일 약 ${plan.durationSeconds.toFixed(1)}초${plan.outsideTarget ? ' · 완전한 단위를 유지해 15~20초 범위를 벗어납니다.' : ''}`;
+        } catch (error) { $(id).textContent = error.message; }
+      }
+    } else {
+      $('original-estimate').textContent = '음원 준비 후 예상 길이가 표시됩니다.';
+      $('repeated-estimate').textContent = '';
+    }
     zone.tabIndex = state === 'recording' ? 0 : -1;
     letters.forEach((letter, i) => {
       const bar = recorder.bars[Math.floor(i / 5)], position = i % 5;
@@ -39,9 +71,13 @@
     }
   }
   function reset(message, start = false) {
+    exportGeneration++;
+    $('export-status').textContent = '현재 리듬과 완료한 손글씨 선율을 WAV로 저장합니다.';
     playbackRequest++;
     player.stop();
     visual.stop();
+    handwriting.clear(); handwritingOpen = false;
+    $('handwriting-status').textContent = 'hello나 다른 인사말을 자유롭게 써 주세요. 문자 인식은 하지 않습니다.';
     recorder.reset();
     composing = false;
     state = start ? 'recording' : 'waiting';
@@ -65,7 +101,7 @@
       ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey }, performance.now());
     if (result === 'complete') {
       state = 'complete';
-      render('네 마디 기록을 마쳤습니다. ‘리듬 듣기’를 누르면 전체를 반복 재생합니다.');
+      render('네 마디 기록을 마쳤습니다. 리듬만 듣거나 손글씨 선율을 추가해 보세요.');
     } else if (result === 'bar-complete') render(`${recorder.completedBars}마디 완료. ${recorder.completedBars + 1}마디의 hello → Enter를 입력해 주세요.`);
     else if (result === 'awaiting-enter') render(`${recorder.completedBars + 1}마디: 원하는 간격을 두고 Enter를 누르면 이 마디가 완료됩니다.`);
     else if (result === 'accepted') render(`${recorder.completedBars + 1}마디: 자연스러운 속도로 hello를 입력한 뒤 Enter를 눌러 주세요.`);
@@ -83,35 +119,94 @@
   });
   zone.addEventListener('beforeinput', event => event.preventDefault());
   zone.addEventListener('blur', cancelAttempt);
-  window.addEventListener('blur', cancelAttempt);
-  document.addEventListener('visibilitychange', () => { if (document.hidden) cancelAttempt(); });
-  $('play').addEventListener('click', async () => {
-    if (state !== 'complete' || player.bank.status !== 'ready') return;
+  const leave = () => { cancelAttempt(); handwriting.cancelActive(); if (state === 'playing') stopPlayback('화면을 벗어나 재생을 정지했습니다. 다시 들을 수 있습니다.'); };
+  window.addEventListener('blur', leave);
+  window.addEventListener('pagehide', leave);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) leave(); });
+  async function playRecording(withMelody = false) {
+    if (exporting || state !== 'complete' || player.bank.status !== 'ready') return;
+    if (withMelody && !handwriting.melody) return;
     const request = ++playbackRequest;
     state = 'playing';
-    render('네 마디 전체를 반복 재생합니다. 각 마디의 o → Enter 간격을 유지합니다. ‘정지’를 누르면 멈춥니다.');
+    render(withMelody ? '네 마디 리듬과 손글씨 선율을 함께 반복 재생합니다. ‘정지’를 누르면 멈춥니다.' : '네 마디 리듬을 반복 재생합니다. ‘정지’를 누르면 멈춥니다.');
     try {
       await player.play(recorder.relative, () => {
         if (request !== playbackRequest) return;
         state = 'complete';
         visual.stop();
+        handwriting.stop();
         render('재생을 마쳤습니다. 같은 리듬을 다시 들을 수 있습니다.');
-      }, { loop: true, loopGapMs: recorder.loopGapMs });
-      if (request === playbackRequest && player.playing) visual.start(player);
+      }, { loop: true, loopGapMs: recorder.loopGapMs, melody: withMelody ? handwriting.melody : null });
+      if (request === playbackRequest && player.playing) {
+        visual.start(player);
+        if (withMelody) handwriting.start(player);
+      }
     } catch (error) {
       if (request !== playbackRequest) return;
       state = 'complete';
       visual.stop();
+      handwriting.stop();
       render(`오디오를 시작하지 못했습니다: ${error.message} 오디오 장치와 브라우저 설정을 확인해 주세요.`);
     }
-  });
-  $('stop').addEventListener('click', () => {
+  }
+  $('play').addEventListener('click', () => playRecording());
+  $('play-together').addEventListener('click', () => playRecording(true));
+  function stopPlayback(message) {
     playbackRequest++;
     player.stop();
     visual.stop();
-    state = 'complete';
-    render('재생을 정지했습니다. 기록한 리듬을 다시 들을 수 있습니다.');
+    handwriting.stop();
+    if (state === 'playing') state = 'complete';
+    render(message);
+  }
+  $('stop').addEventListener('click', () => stopPlayback('재생을 정지했습니다. 기록한 리듬을 다시 들을 수 있습니다.'));
+  $('stop-handwriting').addEventListener('click', () => stopPlayback('함께 듣기를 정지했습니다. 같은 기록을 다시 들을 수 있습니다.'));
+  $('add-handwriting').addEventListener('click', () => {
+    if (!handwriting.melody && !handwriting.recorder.strokes.length) $('handwriting-status').textContent = 'hello나 다른 인사말을 자유롭게 써 주세요. 문자 인식은 하지 않습니다.';
+    handwritingOpen = true; render(); handwriting.draw();
   });
+  $('finish-writing').addEventListener('click', () => {
+    try {
+      const melody = handwriting.finish(recorder.relative.at(-1));
+      $('handwriting-status').textContent = `${melody.notes.length}개 음 · ${melody.handwritingMs.toFixed(0)}ms 필기 → ${melody.targetMs.toFixed(1)}ms 선율. ${melody.short ? '재생 구간이 짧습니다. 더 천천히 타이핑하면 선율을 자세히 들을 수 있습니다.' : '‘함께 듣기’를 눌러 보세요.'}`;
+    } catch (error) { $('handwriting-status').textContent = error.message; }
+    render();
+  });
+  $('clear-writing').addEventListener('click', () => {
+    stopPlayback(); handwriting.clear();
+    $('handwriting-status').textContent = '손글씨를 지웠습니다. 드래그로 다시 써 주세요. 리듬만 듣기도 가능합니다.';
+    render();
+  });
+  $('without-melody').addEventListener('click', () => {
+    stopPlayback(); handwriting.clear(); handwritingOpen = false; render();
+  });
+  $('melody-volume').addEventListener('input', event => {
+    player.setMelodyVolume(Number(event.target.value) / 100 * .15);
+    $('melody-volume-value').textContent = `${event.target.value}%`;
+  });
+  async function exportWav(repeated) {
+    if (exporting || !recorder.complete) return;
+    if (player.bank.status !== 'ready') { $('export-status').textContent = '음원 준비가 끝난 뒤 다시 다운로드해 주세요.'; return; }
+    exporting = true;
+    const generation = ++exportGeneration;
+    // Snapshot the chosen content and volume; stop live speakers before rendering.
+    const options = { relative: [...recorder.relative], bank: player.bank, repeated,
+      melody: handwriting.melody ? { notes: handwriting.melody.notes.map(note => ({ ...note })) } : null,
+      melodyVolume: player.melodyVolume };
+    stopPlayback();
+    $('export-status').textContent = 'WAV 렌더링 중… 스피커로 재생하지 않습니다.';
+    try {
+      const result = await HelloWav.renderExport(options);
+      if (generation !== exportGeneration) return;
+      const filename = repeated ? 'greeting-repeated.wav' : 'greeting-original.wav';
+      HelloWav.download(result.wav, filename);
+      $('export-status').textContent = `${filename} 다운로드 준비 완료 · ${result.plan.durationSeconds.toFixed(2)}초 · ${result.plan.count}회${result.gain < 1 ? ` · 클리핑 방지: 전체 ${(-20 * Math.log10(result.gain)).toFixed(1)}dB 감쇠` : ' · 음량 보정 없음'}. 브라우저의 다운로드 목록을 확인해 주세요.`;
+    } catch (error) {
+      if (generation === exportGeneration) $('export-status').textContent = `WAV 내보내기 실패: ${error.message} 다시 시도해 주세요.`;
+    } finally { exporting = false; render(); }
+  }
+  $('download-original').addEventListener('click', () => exportWav(false));
+  $('download-repeated').addEventListener('click', () => exportWav(true));
   async function loadSounds() {
     $('retry-sounds').hidden = true;
     $('sound-status').textContent = '음원 준비 중…';

@@ -87,20 +87,25 @@
     r.reset(); assert(r.completedBars === 0 && r.times.length === 0 && r.held.size === 0 && !r.active);
   });
   function fakeAudio(state = 'running') {
-    const sources = [], gains = [];
+    const sources = [], gains = [], oscillators = [];
     const context = { state, currentTime: 10, destination: {},
       createBufferSource() {
         const source = { connect() {}, disconnect() { this.disconnected = true; },
           start(at) { this.startAt = at; }, stop(at) { (this.stops ||= []).push(at); } };
         sources.push(source); return source;
       },
+      createOscillator() {
+        const source = this.createBufferSource();
+        source.frequency = { setValueAtTime(value, at) { source.frequencyValue = value; source.frequencyAt = at; } };
+        oscillators.push(source); return source;
+      },
       createGain() {
-        const gain = { gain: { setValueAtTime(value) { gain.level = value; } },
+        const gain = { gain: { setValueAtTime(value) { gain.level = value; }, linearRampToValueAtTime() {}, setTargetAtTime(value) { gain.level = value; } },
           connect() {}, disconnect() { this.disconnected = true; } };
         gains.push(gain); return gain;
       }
     };
-    return { context, sources, gains };
+    return { context, sources, gains, oscillators };
   }
   const fakeBank = () => ({ status: 'ready', buffers: new Map([...'helo'].map(letter => [letter, { letter }])) });
   const audio = fakeAudio(), bank = fakeBank();
@@ -393,6 +398,8 @@
   await until(() => fd.getElementById('sound-status').textContent.includes('완료'));
   check('UI: 로딩 재시도 성공 후 오류와 재시도 버튼 해제', () => assert(fd.getElementById('retry-sounds').hidden));
   failureFrame.remove();
+  await runHandwritingTests({ check, assert, same, realBank, fakeAudio, frame, uiAudio, type });
+  await runWavTests({ check, assert, same, realBank, fourRecord, fakeAudio, frame, uiAudio, type });
   report.textContent = `${lines.join('\n')}\n\n${lines.length - failed}/${lines.length} passed`;
   report.dataset.result = failed ? 'fail' : 'pass';
 })().catch(error => {

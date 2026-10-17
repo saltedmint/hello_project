@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="styles.css">
   <script src="assets/drums/embedded.js" defer></script>
   <script src="rhythm.js" defer></script>
+  <script src="handwriting.js" defer></script>
+  <script src="wav-export.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -29,10 +31,31 @@
       <p class="instrument-key">h · 킥 <span>e · 스네어</span><span>l · 닫힌 하이햇</span><span>o · 톰</span></p>
       <div class="controls">
         <button id="start" class="primary">입력 시작 <span aria-hidden="true">↗</span></button>
-        <button id="play" disabled>리듬 듣기 <span aria-hidden="true">▷</span></button>
+        <button id="play" disabled>리듬만 듣기 <span aria-hidden="true">▷</span></button>
+        <button id="add-handwriting" disabled>손글씨 선율 추가하기</button>
         <button id="stop" disabled>정지 <span aria-hidden="true">□</span></button>
         <button id="reset" class="quiet">다시 입력하기 <span aria-hidden="true">↺</span></button>
       </div>
+      <section id="handwriting-panel" hidden aria-labelledby="handwriting-title">
+        <div class="handwriting-heading"><h2 id="handwriting-title">손끝으로 그리는 선율</h2><button id="without-melody" class="quiet">선율 없이 돌아가기</button></div>
+        <p class="handwriting-hint">위쪽은 높은 음, 아래쪽은 낮은 음입니다. 손글씨는 타이핑 리듬 길이에 맞춰 재생됩니다.</p>
+        <canvas id="handwriting-canvas" aria-label="손글씨 입력 공간. 마우스나 터치패드로 드래그하세요.">손글씨 입력에는 Canvas를 지원하는 브라우저가 필요합니다.</canvas>
+        <p id="handwriting-status" role="status">hello나 다른 인사말을 자유롭게 써 주세요. 문자 인식은 하지 않습니다.</p>
+        <div class="handwriting-controls">
+          <button id="finish-writing">쓰기 완료</button><button id="clear-writing">지우고 다시 쓰기</button>
+          <button id="play-together" class="primary" disabled>함께 듣기 ▷</button><button id="stop-handwriting" disabled>정지 □</button>
+          <label for="melody-volume">선율 음량 <input id="melody-volume" type="range" min="0" max="100" value="47"><output id="melody-volume-value" for="melody-volume">47%</output></label>
+        </div>
+      </section>
+      <section id="export-panel" hidden aria-labelledby="export-title">
+        <h2 id="export-title">WAV로 저장하기</h2>
+        <p class="export-hint">44.1kHz · 16bit PCM WAV. 완료한 손글씨 선율이 있으면 함께 포함합니다. 다운로드 후 음악 생성 서비스에 직접 업로드하세요.</p>
+        <div class="export-options">
+          <div><button id="download-original" disabled>원본 WAV 다운로드</button><span id="original-estimate"></span></div>
+          <div><button id="download-repeated" disabled>반복 WAV 다운로드</button><span id="repeated-estimate"></span></div>
+        </div>
+        <p id="export-status" role="status">입력 완료 후 WAV로 저장할 수 있습니다.</p>
+      </section>
       <div id="results" hidden>
         <div class="result-heading"><span>마디별 입력 간격 · ms</span><span>네 마디 루프 <strong id="total"></strong></span></div>
         <div class="table-scroll"><table><thead><tr><th>마디</th><th>h → e</th><th>e → l</th><th>l → l</th><th>l → o</th><th>o → Enter</th><th>마디 길이</th></tr></thead><tbody id="bar-metrics"></tbody></table></div>

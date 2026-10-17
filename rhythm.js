@@ -76,6 +76,53 @@
   });
   const spacingFor = gap => SPACING.minimumPx + gap * SPACING.pixelsPerMs;
   const activeIndices = (events, time) => events.filter(event => time >= event.at && time < event.at + 0.12).map(event => event.index);
+  const SYNTH = Object.freeze({ type: 'triangle', attack: .008, release: .02 });
+  const PLAYBACK_LEAD_SECONDS = .06;
+
+  function buildEvents(relative, melody = null) {
+    if (!relative.length || relative[0] !== 0 || relative.some((time, i) => !Number.isFinite(time) || time < 0 || (i && time < relative[i - 1]))) {
+      throw new Error('타이핑 시간 기록이 올바르지 않습니다. 다시 입력해 주세요.');
+    }
+    const events = relative.map((atMs, index) => {
+      const letter = 'hello'[index % 5];
+      return { kind: 'drum', atMs, index, letter, level: INSTRUMENTS[letter].gain };
+    });
+    for (const note of melody?.notes || []) {
+      if (![note.startMs, note.endMs, note.midi].every(Number.isFinite) || note.startMs < 0 || note.endMs <= note.startMs || note.midi < 0 || note.midi > 127) {
+        throw new Error('손글씨 선율 기록이 올바르지 않습니다. 다시 써 주세요.');
+      }
+      events.push({ kind: 'melody', atMs: note.startMs, endMs: note.endMs, midi: note.midi });
+    }
+    return events;
+  }
+
+  // Live playback and WAV export both use this event list and node scheduler.
+  function scheduleEvents(context, bank, events, start, { melodyDestination = null, onVoice = () => {}, onDrum = () => {} } = {}) {
+    for (const event of events) {
+      const at = start + event.atMs / 1000;
+      const gain = context.createGain();
+      const source = event.kind === 'drum' ? context.createBufferSource() : context.createOscillator();
+      onVoice(source, gain);
+      if (event.kind === 'drum') {
+        source.buffer = bank.buffers.get(event.letter);
+        if (!source.buffer) throw new Error(`${event.letter} 타악기 샘플이 준비되지 않았습니다.`);
+        gain.gain.setValueAtTime(event.level, at);
+        source.connect(gain); gain.connect(context.destination);
+        onDrum({ index: event.index, letter: event.letter, at });
+        source.start(at);
+      } else {
+        const end = start + event.endMs / 1000;
+        source.type = SYNTH.type;
+        source.frequency.setValueAtTime(440 * 2 ** ((event.midi - 69) / 12), at);
+        gain.gain.setValueAtTime(0, at);
+        gain.gain.linearRampToValueAtTime(1, at + Math.min(SYNTH.attack, (end - at) * .2));
+        gain.gain.setValueAtTime(1, end);
+        gain.gain.linearRampToValueAtTime(0, end + SYNTH.release);
+        source.connect(gain); gain.connect(melodyDestination);
+        source.start(at); source.stop(end + SYNTH.release);
+      }
+    }
+  }
 
   function embeddedBytes(file) {
     const encoded = globalThis.HelloDrumSamples?.[file];
@@ -155,8 +202,14 @@
       this.timers = timers;
       this.loopTimer = null;
       this.looping = false;
+      this.melodyGain = null;
+      this.melodyVolume = 0.07;
     }
-    async play(relative, onComplete, { loop = false, loopGapMs } = {}) {
+    setMelodyVolume(value) {
+      this.melodyVolume = Math.max(0, Math.min(.15, value));
+      if (this.melodyGain) this.melodyGain.gain.setTargetAtTime(this.melodyVolume, this.context.currentTime, .01);
+    }
+    async play(relative, onComplete, { loop = false, loopGapMs, melody = null } = {}) {
       this.stop();
       const generation = this.generation;
       if (this.bank.status !== 'ready') throw new Error('음원 준비가 완료되지 않았습니다.');
@@ -170,32 +223,31 @@
         if (this.context.state === 'suspended') await this.context.resume();
         if (generation !== this.generation) return;
         if (this.context.state !== 'running') throw new Error('오디오 장치를 사용할 수 없습니다.');
-        const start = this.context.currentTime + 0.06;
+        const eventList = buildEvents(relative, melody);
+        const start = this.context.currentTime + PLAYBACK_LEAD_SECONDS;
+        this.startTime = start;
         this.looping = loop;
-        const scheduleCycle = cycleStart => {
-        for (const [index, ms] of relative.entries()) {
-          const letter = 'hello'[index % 5];
-          const source = this.context.createBufferSource();
-          const gain = this.context.createGain();
-          const at = cycleStart + ms / 1000;
-          source.buffer = this.bank.buffers.get(letter);
-          const voice = { source, gain };
-          this.voices.add(voice);
-          this.events.push({ index, letter, at });
-          gain.gain.setValueAtTime(INSTRUMENTS[letter].gain, at);
-          source.connect(gain);
-          gain.connect(this.context.destination);
+        if (melody) {
+          this.melodyGain = this.context.createGain();
+          this.melodyGain.gain.setValueAtTime(this.melodyVolume, this.context.currentTime);
+          this.melodyGain.connect(this.context.destination);
+        }
+        const watchVoice = (source, gain) => {
+          const voice = { source, gain }; this.voices.add(voice);
           source.onended = () => {
             source.disconnect(); gain.disconnect(); this.voices.delete(voice);
             if (!this.looping && this.voices.size === 0 && generation === this.generation) {
-              this.playing = false;
-              this.events = [];
+              this.playing = false; this.events = [];
+              if (this.melodyGain) this.melodyGain.disconnect(); this.melodyGain = null;
               onComplete();
             }
           };
-          // Every hit has its own source; never choke previous hits (including l).
-          source.start(at);
-        }
+        };
+        const scheduleCycle = cycleStart => {
+          scheduleEvents(this.context, this.bank, eventList, cycleStart, {
+            melodyDestination: this.melodyGain, onVoice: watchVoice,
+            onDrum: event => this.events.push(event)
+          });
         };
         scheduleCycle(start);
         if (loop) {
@@ -235,6 +287,7 @@
         source.disconnect();
       }
       this.voices.clear();
+      if (this.melodyGain) this.melodyGain.disconnect(); this.melodyGain = null;
     }
   }
 
@@ -265,5 +318,5 @@
       this.elements.forEach(element => element.classList.remove('sounding'));
     }
   }
-  globalThis.HelloRhythm = { Recorder, BarRecorder, RhythmPlayer, SampleBank, PlaybackVisual, SPACING, INSTRUMENTS, spacingFor, activeIndices, embeddedBytes };
+  globalThis.HelloRhythm = { Recorder, BarRecorder, RhythmPlayer, SampleBank, PlaybackVisual, SPACING, INSTRUMENTS, spacingFor, activeIndices, embeddedBytes, buildEvents, scheduleEvents, SYNTH, PLAYBACK_LEAD_SECONDS };
 })();

@@ -43,9 +43,24 @@ window.addEventListener('load', async () => {
     assert($('status').textContent === '재생 중' && !$('stop').disabled);
     assert(!$('feedback').textContent.includes('시작하지 못했습니다'));
     $('stop').click(); assert(!$('play').disabled);
+    $('add-handwriting').click();
+    const canvas=$('handwriting-canvas'),captured=new Set();
+    canvas.setPointerCapture=id=>captured.add(id);canvas.hasPointerCapture=id=>captured.has(id);canvas.releasePointerCapture=id=>captured.delete(id);
+    let writingTime=10000;
+    Object.defineProperty(performance,'now',{configurable:true,value:()=>writingTime});
+    for(const [event,x,y,time] of [['pointerdown',.2,.8,10000],['pointermove',.5,.5,10500],['pointermove',.7,.2,11000],['pointerup',.8,.2,11500]]){
+      const rect=canvas.getBoundingClientRect();writingTime=time;
+      canvas.dispatchEvent(new PointerEvent(event,{pointerId:1,isPrimary:true,button:0,bubbles:true,cancelable:true,
+        clientX:rect.left+x*rect.width,clientY:rect.top+y*rect.height}));
+    }
+    delete performance.now;
+    $('finish-writing').click();assert(!$('play-together').disabled);
+    $('play-together').click();await Promise.resolve();await Promise.resolve();
+    assert($('status').textContent==='재생 중' && !$('feedback').textContent.includes('시작하지 못했습니다'));
+    $('clear-writing').click();assert(!$('play').disabled && $('play-together').disabled);
     $('play').click(); await Promise.resolve(); $('reset').click();
     assert($('status').textContent === '입력 중' && $('results').hidden);
     assert([...$('letters').querySelectorAll('.letter')].every(el => !el.classList.contains('sounding')));
-    report.textContent = 'PASS file://: no fetch, 4 decoded drums, real offline render, four bars, play, stop, replay, reset';
+    report.textContent = 'PASS file://: no fetch, real audio, four bars, handwriting, together, clear, stop, replay, reset';
   } catch (error) { report.textContent = `FAIL file://: ${error.stack}`; }
 });
