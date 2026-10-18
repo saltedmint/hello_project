@@ -45,7 +45,7 @@ const type=async char=>{
  await delay(35);
 };
 try{
- $('choose-b').click();
+ $('choose-b').click();HelloTypeExperience.openOperator();
  if(sessionStorage.getItem('q-stage')==='dots-restore'){
    assert(D.serialize(Q.store.getRecords())===sessionStorage.getItem('q-demo-expected'),'demo native reload');
    assert(!Q.player.context&&!Q.player.running,'demo restore without autoplay');
@@ -100,7 +100,7 @@ try{
 }catch(error){navigator.sendBeacon('ENDPOINT','ERROR '+error.stack+' / '+$('q-feedback').textContent);}
 });</script>'''
 
-def run(server,protocol):
+def run(server,protocol,timeout=35):
     reports.clear();finished.clear()
     endpoint=f'http://127.0.0.1:{server.server_port}/result'
     markup=(ROOT/'index.html').read_text(encoding='utf-8').replace('</body>',SCRIPT.replace('ENDPOINT',endpoint)+'</body>')
@@ -114,7 +114,7 @@ def run(server,protocol):
             url=fixture.as_uri() if protocol=='file' else f'http://127.0.0.1:{server.server_port}/{fixture.name}'
             process=subprocess.Popen([BROWSER,'--headless','--disable-gpu','--no-first-run','--remote-debugging-port=0','--autoplay-policy=no-user-gesture-required','--window-size=1440,1000','--user-data-dir='+str(profile),url],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
             try:
-                if not finished.wait(35):raise RuntimeError(f'{protocol}: question browser timeout')
+                if not finished.wait(timeout):raise RuntimeError(f'{protocol}: question browser timeout')
                 if not reports[0].startswith('PASS'):raise RuntimeError(reports[0])
                 target=downloads/'three-questions-v2.json'
                 for _ in range(100):

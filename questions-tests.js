@@ -112,7 +112,7 @@ globalThis.runQuestionTests=async({check,assert,same,frame})=>{
   const resuming=suspended.start(plan);suspended.stop();resume();await resuming;
   check('질문:AudioContext resume 중 정지하면 늦은 예약 없음',()=>assert(!suspended.running&&suspended.timer===null&&suspendedClock.sources.length===0));
   const wait=async predicate=>{for(let i=0;i<500;i++){if(predicate())return;await new Promise(resolve=>setTimeout(resolve,10));}throw Error('question UI timeout / '+$('q-feedback').textContent);};
-  Q.store.clear();w.HelloExperiments.selectMode('b');Q.player.context=fakeContext();
+  Q.store.clear();w.HelloExperiments.selectMode('b');w.HelloTypeExperience.openOperator();Q.player.context=fakeContext();
   let time=10000;const oldNow=w.performance.now.bind(w.performance);Object.defineProperty(w.performance,'now',{configurable:true,value:()=>time});
   const input=(value,type='insertText',composing=false)=>{$('q-answer').value=value;$('q-answer').setSelectionRange(value.length,value.length);$('q-answer').dispatchEvent(new w.InputEvent('input',{inputType:type,isComposing:composing,bubbles:true}));};
   $('q-begin').click();$('q-intro-start').click();await wait(()=>!$('q-answer').disabled&&Q.diagnostics().questionIndex===0);

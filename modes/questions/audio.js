@@ -1,10 +1,10 @@
 (() => {
   'use strict';
   const C=HelloQuestionConfig;
-  function buildPlan(records,{questionId='all',speed=1,expression='morse'}={}) {
+  function buildPlan(records,{questionId='all',speed=1,expression='morse',scoreFor=null}={}) {
     if(![.5,1,2,4].includes(speed))throw Error('공통 재생 배율이 올바르지 않습니다.');
     if(!['morse','dots'].includes(expression))throw Error('표현 모드를 확인해 주세요.');
-    const score=answer=>expression==='dots'?HelloQuestionDots.compile(answer):answer.morse;
+    const score=scoreFor||(answer=>expression==='dots'?HelloQuestionDots.compile(answer):answer.morse);
     const groups=[],events=[];let offset=0;
     const questions=C.questions.filter(q=>questionId==='all'||q.id===questionId);
     for(const question of questions){
@@ -23,13 +23,13 @@
     connectOutput(layers){
       this.master=this.context.createGain();this.master.gain.value=this.volume*.6;
       this.compressor=this.context.createDynamicsCompressor();this.compressor.threshold.value=-16;this.compressor.knee.value=18;this.compressor.ratio.value=8;
-      this.master.connect(this.compressor).connect(this.context.destination);this.layerGain=.45/Math.sqrt(Math.max(1,layers));
+      this.master.connect(this.compressor).connect(this.output||this.context.destination);this.layerGain=.45/Math.sqrt(Math.max(1,layers));
     }
     schedule(event,when,duration){
       let pan=this.panners.get(event.participantId);
       if(!pan){pan=this.context.createStereoPanner();pan.pan.value=event.pan;pan.connect(this.master);this.panners.set(event.participantId,pan);}
       const source=this.context.createOscillator(),gain=this.context.createGain();source.type='sine';source.frequency.value=440*2**((event.midi-69)/12);
-      const attack=Math.min(.008,duration*.2),release=Math.min(.012,duration*.25),peak=.3*this.layerGain;
+      const attack=Math.min(.008,duration*.2),release=Math.min(.012,duration*.25),peak=.3*(event.layerCount ? .45/Math.sqrt(event.layerCount) : this.layerGain);
       gain.gain.setValueAtTime(0,when);gain.gain.linearRampToValueAtTime(peak,when+attack);gain.gain.setValueAtTime(peak,when+duration-release);gain.gain.linearRampToValueAtTime(0,when+duration);
       source.connect(gain).connect(pan);const voice={source,gain};this.voices.add(voice);
       source.onended=()=>{source.disconnect();gain.disconnect();this.voices.delete(voice);};source.start(when);source.stop(when+duration);

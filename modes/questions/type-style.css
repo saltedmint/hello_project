@@ -1,0 +1,44 @@
+body.type-audience{background:#000;color:#eee;color-scheme:dark}
+body.type-audience main{padding:0;max-width:none}
+body.type-audience #mode-nav,body.type-audience main>header,body.type-audience main>footer{display:none}
+body.type-audience #mode-b{min-height:100dvh;background:#000}
+#type-experience{min-height:100dvh;font-family:'Segoe UI','Malgun Gothic',sans-serif;background:#000}
+#type-experience section{background:#000}
+#yt-main,#yt-question,#yt-processing,#yt-result{position:relative;min-height:100dvh}
+.yt-brand{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;z-index:1;pointer-events:none}
+.yt-brand h1{font:normal clamp(86px,12vw,180px)/1 Georgia,serif;letter-spacing:-.065em;margin:0 0 40px;color:#f4f4f4}
+.yt-brand p{font-size:17px;color:#bdbdbd;letter-spacing:.07em;margin:0 0 32px}
+#type-experience button,#type-experience select{background:#080808;border:1px solid #343434;color:#ccc;border-radius:3px;font:12px 'Segoe UI','Malgun Gothic',sans-serif;padding:9px 13px}
+#type-experience button:hover{background:#1a1a1a}
+#yt-sound-enable{pointer-events:auto;font-size:11px!important;color:#888!important}
+#yt-decoration{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+#yt-decoration i{position:absolute;display:block;height:3px;background:#fff;opacity:.12;border-radius:2px}
+.yt-background-dot{width:3px}.yt-background-dash{width:15px}
+#yt-settings{position:absolute;bottom:24px;right:28px;z-index:3;width:min(360px,85vw);background:#000e;color:#8f8f8f;font-size:11px;border:1px solid #242424;border-radius:4px;padding:12px 16px}
+#yt-settings summary{cursor:pointer;user-select:none;list-style:none;letter-spacing:.1em}
+#yt-settings label{display:flex;align-items:center;gap:12px;margin:14px 0}
+#yt-settings select{margin-left:auto}
+#yt-settings input[type=range]{width:135px;accent-color:#aaa}
+.yt-setting-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+#yt-demo-count{font-size:10px;color:#777;line-height:1.6}
+.yt-question-content{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:min(820px,84vw);text-align:center}
+#yt-prompt-ko{font-size:clamp(24px,3vw,38px);font-weight:400;line-height:1.8;margin:0 0 12px;word-break:keep-all;color:#eee}
+#yt-prompt-en{font:20px/1.7 Georgia,serif;color:#777;margin:0 0 54px}
+#yt-answer{box-sizing:border-box;width:100%;resize:none;border:0;border-bottom:1px solid #444;border-radius:0;background:#000;color:#eee;padding:18px 12px;outline:none;text-align:center;font:25px/1.8 'Segoe UI','Malgun Gothic',sans-serif}
+#yt-answer:focus{border-color:#aaa}
+#yt-processing{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px}
+.yt-processing-label{font-size:28px;font-weight:300;letter-spacing:.18em;margin:0}
+#yt-processing-error{max-width:650px;font-size:13px;color:#aaa;line-height:1.8;text-align:center;padding:25px}
+#yt-feedback{position:fixed;left:12%;bottom:35px;width:60%;font-size:12px;color:#999;line-height:1.8;pointer-events:none;z-index:2}
+#yt-result{display:flex;align-items:center;justify-content:center}
+#yt-ending{min-height:100dvh;display:flex;align-items:center;justify-content:center;background:#000}
+#yt-return-prompt{font-size:17px;color:#bdbdbd;letter-spacing:.05em;text-align:center}
+#yt-graphics{width:84vw;max-height:90dvh;overflow-y:auto;scrollbar-width:none}
+#yt-graphics .q-row{display:block;padding:0;height:clamp(16px,calc(76dvh / var(--rows,1)),40px);min-height:0;border:0;background:#000;animation:none}
+#yt-graphics .q-row-scroll{height:100%;scrollbar-width:none}
+#yt-graphics .q-track{border:0}
+#yt-graphics .q-tone,#yt-graphics .q-typing-dot{background:#ddd;opacity:.55}
+#yt-graphics .q-sounding{background:#fff;opacity:1;box-shadow:0 0 7px #fff9}
+#yt-graphics .q-word-boundary,#yt-graphics .q-jamo-boundary{border:0}
+#yt-graphics .q-unsupported{color:#888}
+@media(prefers-reduced-motion:reduce){#yt-decoration{opacity:.5}}

@@ -88,7 +88,7 @@ globalThis.runQuestionDotTests=async({check,assert,same,frame})=>{
   }
   const flush=async()=>{for(let i=0;i<5;i++)await Promise.resolve();};
   const change=(id,value)=>{$(id).value=value;$(id).dispatchEvent(new w.Event('change'));};
-  Q.store.clear();w.HelloExperiments.selectMode('b');$('q-seed-demo').click();$('q-seed-demo').click();
+  Q.store.clear();w.HelloExperiments.selectMode('b');w.HelloTypeExperience.openOperator();$('q-seed-demo').click();$('q-seed-demo').click();
   const real={...D.clone(old[0]),id:'real-ui',source:'participant'};Q.store.add([real]);$('q-open-landscape').click();
   check('점 UI:실제 localStorage 등록조회10명/30답변 ·중복 없음 ·실제11번째 보존',()=>assert(Q.store.records.length===11&&$('q-demo-count').textContent.includes('30답변')&&new D.Store(w.localStorage).restore().length===11));
   change('q-data-filter','actual');check('점 UI:실제만/더미만/함께 필터',()=>{assert($('q-board').querySelectorAll('.q-row').length===3);change('q-data-filter','demo');assert($('q-board').querySelectorAll('.q-row').length===30);change('q-data-filter','all');assert($('q-board').querySelectorAll('.q-row').length===33);});

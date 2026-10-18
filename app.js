@@ -16,7 +16,7 @@
     importGeneration++;
     if (mode === 'a') HelloOrchestra.leave();
     if (mode === 'b-legacy') HelloSoundscape.leave();
-    if (mode === 'b') HelloQuestions.leave();
+    if (mode === 'b') HelloTypeExperience.leave();
     mode = next;
     $('mode-home').hidden = mode !== 'home'; $('mode-a').hidden = mode !== 'a'; $('mode-b').hidden = mode !== 'b';
     $('mode-b-legacy').hidden = mode !== 'b-legacy';
@@ -38,7 +38,7 @@
       } finally { routing = false; }
     }
     if (mode === 'b-legacy') HelloSoundscape.enter([...records.values()]);
-    if (mode === 'b') HelloQuestions.enter();
+    if (mode === 'b') HelloTypeExperience.enter();
   }
   function importText(text) {
     const checked = HelloRecording.parse(text);
@@ -79,4 +79,6 @@
   globalThis.HelloExperiments = { selectMode, importText, importFile,
     getRecord: () => selected ? HelloRecording.validate(selected) : null,
     getRecords: () => [...records.values()].map(HelloRecording.validate), getMode: () => mode };
+  selectMode('b');
+  window.addEventListener('pageshow',event=>{if(event.persisted&&mode==='b'&&!HelloTypeExperience.diagnostics().active)HelloTypeExperience.enter();});
 })();

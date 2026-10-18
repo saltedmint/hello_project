@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="modes/soundscape.css">
   <link rel="stylesheet" href="modes/questions/style.css">
+  <link rel="stylesheet" href="modes/questions/type-style.css">
   <script src="assets/drums/embedded.js" defer></script>
   <script src="common/typing.js" defer></script><script src="common/audio.js" defer></script><script src="common/recording.js" defer></script><script src="modes/orchestra-audio.js" defer></script>
   <script src="modes/orchestra-handwriting.js" defer></script>
@@ -26,6 +27,11 @@
   <script src="modes/questions/audio.js" defer></script>
   <script src="modes/questions/visual.js" defer></script>
   <script src="modes/questions/controller.js" defer></script>
+  <script src="modes/questions/type-config.js" defer></script>
+  <script src="modes/questions/type-trim.js" defer></script>
+  <script src="modes/questions/type-sequence.js" defer></script>
+  <script src="modes/questions/type-sound.js" defer></script>
+  <script src="modes/questions/type-experience.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -96,6 +102,33 @@
     </section>
     </div>
     <section id="mode-b" hidden aria-labelledby="q-title">
+      <div id="type-experience" data-state="main">
+        <section id="yt-main">
+          <div id="yt-decoration" aria-hidden="true"></div>
+          <div class="yt-brand"><h1>Your Type</h1><p>엔터키를 눌러 시작하세요</p><button id="yt-sound-enable">사운드 켜기</button></div>
+          <details id="yt-settings"><summary>설정</summary>
+            <label>답변 표현 <select id="yt-expression"><option selected value="dots">타이핑 점</option><option value="morse">모스</option></select></label>
+            <label><input type="checkbox" id="yt-include-demo" checked>더미 포함</label>
+            <div class="yt-setting-actions"><button id="yt-seed">10인 더미 추가</button><button id="yt-remove-demo">해당 더미만 삭제</button></div>
+            <p id="yt-demo-count"></p>
+            <label>마스터 음량 <input type="range" id="yt-volume" min="0" max="1" step=".01" value=".65"></label>
+            <label><input type="checkbox" id="yt-muted">음소거</label>
+            <div class="yt-setting-actions"><button id="yt-operator">기록 관리 · JSON</button><button id="yt-go-a">A · 인사 오케스트라</button></div>
+          </details>
+        </section>
+        <section id="yt-question" hidden>
+          <div class="yt-question-content"><h2 id="yt-prompt-ko"></h2><p id="yt-prompt-en" lang="en"></p>
+            <textarea id="yt-answer" rows="2" maxlength="240" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="답변. 작성 후 Enter로 제출합니다." disabled></textarea>
+          </div>
+        </section>
+        <section id="yt-processing" hidden><p class="yt-processing-label">처리중</p>
+          <div id="yt-processing-error" hidden><p id="yt-error-message" role="alert"></p><button id="yt-retry">다시 준비하기</button><button id="yt-backup">답변 JSON 보관</button></div>
+        </section>
+        <section id="yt-result" hidden aria-label="부호 그래픽 결과"><div id="yt-graphics"></div></section>
+        <section id="yt-ending" hidden><p id="yt-return-prompt" hidden>엔터키를 눌러 메인 화면으로 돌아가세요</p></section>
+        <p id="yt-feedback" role="status"></p>
+      </div>
+      <div id="q-operator" hidden><button id="yt-operator-back">← Your Type 메인</button>
       <div class="q-mode-heading"><span class="q-eyebrow">B / THREE QUESTIONS, YOUR TIME</span><h1 id="q-title">세 질문과 답변의 시간</h1><button id="q-cancel" hidden>체험 취소</button></div>
       <section id="q-waiting" class="q-centered">
         <p class="q-lead">어떤 답은 바로 떠오르고,<br>어떤 답은 시간이 필요합니다.</p>
@@ -143,6 +176,7 @@
         <label><input id="q-show-original" type="checkbox">운영자 확인: 원문을 누적 화면에 표시</label>
         <p class="q-small">합성 예시의 대기와 멈춤은 설명을 위한 시나리오이며 실제 관객의 일반적 패턴을 주장하지 않습니다.<br>예시에는 Q1에 오래 멈추거나 Q3에 빠르게 답한 경우도 포함합니다. 이전 B 자료는 상단 ‘이전 B 실험’에서 열 수 있습니다.</p>
       </details>
+      </div>
     </section>
     <section id="mode-b-legacy" hidden class="soundscape-entry" aria-labelledby="b-title">
       <aside class="b-sidebar">

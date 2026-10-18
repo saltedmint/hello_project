@@ -2,19 +2,19 @@
   'use strict';
   const C=HelloQuestionConfig;
   const element=(tag,className,text)=>{const node=document.createElement(tag);node.className=className;if(text!==undefined)node.textContent=text;return node;};
-  function row(record,answer,{original=false,current=false,reveal=false,index=0,expression='morse',zoom=1}={}) {
+  function row(record,answer,{original=false,current=false,reveal=false,index=0,expression='morse',zoom=1,score:overrideScore=null}={}) {
     const item=element('div',`q-row${current?' q-current':''}`);item.dataset.participant=record.id;item.dataset.question=answer.questionId;
     const label=element('span','q-row-label',`${String(index+1).padStart(2,'0')} ${record.source==='synthetic'?'합성':current?'나':'관객'}`);
     label.title=`${record.source==='synthetic'?'발표용 합성 예시 · 실제 관객 아님':`관객 ${index+1}`} · ${answer.questionId} v${answer.questionVersion} · ${answer.question.ko}`;
-    const dots=expression==='dots',score=dots?HelloQuestionDots.compile(answer):answer.morse;
-    const scroll=element('div','q-row-scroll'),track=element('div','q-track');track.style.width=`${Math.max(1,dots?score.durationMs*C.pixelsPerMs*zoom:original?answer.submittedAtMs*C.pixelsPerMs:answer.morse.width)}px`;
+    const dots=expression==='dots',score=overrideScore||(dots?HelloQuestionDots.compile(answer):answer.morse);
+    const scroll=element('div','q-row-scroll'),track=element('div','q-track');track.style.width=`${Math.max(1,dots?score.durationMs*C.pixelsPerMs*zoom:original?answer.submittedAtMs*C.pixelsPerMs:score.width)}px`;
     track.setAttribute('aria-label',`${answer.questionId} ${record.source==='synthetic'?'발표용 합성 예시':'관객 응답'} ${dots?'타이핑 점':'모스'}와 침묵`);
     if(dots){
       for(const event of score.events){const point=element('i','q-typing-dot');point.style.left=`${event.atMs*C.pixelsPerMs*zoom}px`;point.dataset.activity=event.activityIndex;point.dataset.at=event.atMs;track.append(point);}
     }else if(original){
       for(const char of answer.characters){const point=element('i','q-original-point');point.style.left=`${char.atMs*C.pixelsPerMs}px`;point.dataset.char=char.index;track.append(point);}
       for(const focus of answer.focusLoss){const band=element('span','q-focus-band');band.style.left=`${focus.fromMs*C.pixelsPerMs}px`;band.style.width=`${Math.max(2,(focus.toMs-focus.fromMs)*C.pixelsPerMs)}px`;band.title=`포커스 이탈 ${(focus.toMs-focus.fromMs).toFixed(0)}ms · ${focus.reason}`;track.append(band);}
-    }else for(const segment of answer.morse.segments){
+    }else for(const segment of score.segments){
       const mark=element('span',`q-segment q-${segment.kind}`);mark.style.left=`${segment.x}px`;mark.style.width=`${segment.width}px`;
       if(segment.kind==='tone'){mark.classList.add(segment.symbol==='.'?'q-dot':'q-dash');mark.dataset.char=segment.charIndex;mark.dataset.at=segment.atMs;}
       if(segment.kind==='unsupported'){mark.textContent='◇';mark.title=`미지원 문자: ${segment.char}`;}
