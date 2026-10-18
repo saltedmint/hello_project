@@ -4,3 +4,10 @@ __pycache__/
 Thumbs.db
 .file-check-*.html
 .http-check-*.html
+dist/
+.env
+.env.*
+!.env.example
+.deploy/
+.sites-runtime/
+/idea/greeting-repeated (1).wav

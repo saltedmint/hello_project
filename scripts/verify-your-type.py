@@ -52,6 +52,7 @@ try{
      assert(T.diagnostics().state==='Q2','wait for native composition completion');
      await delay(20);$('yt-answer').dispatchEvent(new CompositionEvent('compositionend',{data:'사',bubbles:true}));input('감사');
      document.dispatchEvent(new KeyboardEvent('keyup',{key:'Enter',code:'Enter',bubbles:true}));
+     await delay(20);assert(T.diagnostics().state==='Q2','composition Enter does not submit');$('yt-next').click();
    }else enter();
  }
  await wait(()=>T.diagnostics().state==='processing'&&Q.store.records.length===17);const processingStart=T.diagnostics().processingStartedAt;

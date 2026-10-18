@@ -11,10 +11,12 @@
     return {kind:'generated-question-dots',source:'question-rule-v1',questionId:question.id,
       events,durationMs:events.length?at+K.questionToneMs:0};
   }
-  function build(own,records,{expression,includeDemo}){
+  function build(own,records,{expression,includeDemo,preserveEdges=false}){
     if(!['dots','morse'].includes(expression))throw Error('답변 표현을 확인해 주세요.');
     const current=D.validate(own),unique=new Map();
-    for(const value of records){const record=D.validate(value);if(includeDemo||record.source!=='synthetic')unique.set(record.id,record);}
+    for(const value of records){const record=value.publicScoreVersion===1?HelloTypeOnline.validateScores([value])[0]:D.validate(value);if(record.id!==current.id&&(includeDemo||record.source!=='synthetic'))unique.set(record.id,record);}
+    // Reserve one of the twenty layers for the current visitor; storage is unbounded.
+    while(unique.size>=C.maxParticipants)unique.delete([...unique.keys()].at(-1));
     unique.set(current.id,current); // The current audience is always present exactly once.
     const snapshot=D.clone([...unique.values()]),segments=[],events=[];let offset=0;
     function append(kind,question,rows,plan){
@@ -27,8 +29,10 @@
       const score=questionScore(question),id=`generated-${question.id}`;
       append('question',question,[{id,score,expression:'dots'}],{durationMs:score.durationMs,events:score.events.map(e=>({...e,participantId:id,questionId:question.id,midi:72,pan:0})),layers:1});
       for(const [kind,people] of [['own',[current]],['together',snapshot]]){
-        const scoreFor=answer=>HelloTypeTrim.compile(answer,expression);
-        const plan=HelloQuestionAudio.buildPlan(people,{questionId:question.id,speed:1,expression,scoreFor});
+        const scoreFor=answer=>answer.scores?answer.scores[expression]:preserveEdges?(expression==='dots'?HelloQuestionDots.compile(answer):answer.morse):HelloTypeTrim.compile(answer,expression);
+        const plan={events:[],durationMs:0,layers:people.length};
+        for(const record of people){const a=record.answers.find(a=>a.questionId===question.id),score=scoreFor(a);plan.durationMs=Math.max(plan.durationMs,score.durationMs);for(const event of score.events)plan.events.push({...event,participantId:record.id,questionId:question.id,midi:record.sound.midi,pan:record.sound.pan});}
+        plan.events.sort((a,b)=>a.atMs-b.atMs);
         const rows=people.map(record=>{const answer=record.answers.find(a=>a.questionId===question.id);return {id:record.id,record,answer,score:scoreFor(answer),expression};});
         append(kind,question,rows,plan);
       }

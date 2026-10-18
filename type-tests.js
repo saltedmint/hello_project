@@ -104,16 +104,18 @@ globalThis.runTypeTests=async({check,assert,same,frame})=>{
   press({},false);assert(T.diagnostics().state==='Q1');d.dispatchEvent(new w.KeyboardEvent('keyup',{key:'Enter',bubbles:true}));
   check('Your Type:조합 후속 input까지 기다리고 중복/held Enter는 무시',()=>assert(T.diagnostics().state==='Q1'));
   check('입력 효과음:한글 두 활동은 두 음 ·조합 확정/후속 input 중복 없음 ·같은 70ms/음높이/겹침',()=>assert(T.sound.typing.size===2&&T.diagnostics().typingPlayed===2&&[...T.sound.typing].every(v=>v.source.frequency.value===K.typingHz&&Math.abs(v.source.stoppedAt-v.source.startedAt-K.typingToneMs/1000)<1e-8)));
-  await wait(()=>T.diagnostics().state==='Q2'&&!T.diagnostics().locked);
-  check('Your Type:한글 조합 확정 Enter 한 번으로 제출 ·마지막 음절/시각 보존',()=>assert(T.getSession().answers.length===1&&T.getSession().answers[0].text==='가'&&T.getSession().answers[0].submittedAtMs===90620));
+  await new Promise(resolve=>oldSetTimeout(resolve,10));
+  check('Your Type:IME 확정 Enter는 제출하지 않음 ·별도 다음 버튼 제공',()=>assert(T.diagnostics().state==='Q1'&&!$('yt-next').disabled));
+  press();await wait(()=>T.diagnostics().state==='Q2'&&!T.diagnostics().locked);
+  check('Your Type:확정된 한글은 새 Enter로 제출 ·마지막 음절/시각 보존',()=>assert(T.getSession().answers.length===1&&T.getSession().answers[0].text==='가'&&T.getSession().answers[0].submittedAtMs===90620));
   assert(T.sound.typing.size===0);press();assert(T.diagnostics().state==='Q2');time+=800;input('b');input('b ');
   $('yt-answer').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Backspace',bubbles:true}));input('b','deleteContentBackward');
   for(const key of ['Shift','Control','ArrowLeft'])$('yt-answer').dispatchEvent(new w.KeyboardEvent('keydown',{key,bubbles:true}));
   $('yt-answer').dispatchEvent(new w.KeyboardEvent('keydown',{key:'b',repeat:true,bubbles:true,cancelable:true}));
   $('yt-answer').dispatchEvent(new w.Event('paste',{bubbles:true,cancelable:true}));
   check('입력 효과음:공백 포함 ·삭제/수정키/반복/붙여넣기는 추가 음 없음',()=>assert(T.diagnostics().typingPlayed===2&&T.sound.typing.size===2));
-  time+=500;press({keyCode:229});await wait(()=>T.diagnostics().state==='Q3'&&!T.diagnostics().locked);
-  check('Your Type:조합이 끝난 Enter는 잔여 keyCode 229에도 한 번에 제출',()=>assert(T.getSession().answers.length===2));
+  time+=500;press({keyCode:229});assert(T.diagnostics().state==='Q2');$('yt-next').click();await wait(()=>T.diagnostics().state==='Q3'&&!T.diagnostics().locked);
+  check('Your Type:229 Enter는 IME에 맡기고 다음 버튼으로 한 번에 제출',()=>assert(T.getSession().answers.length===2));
   time+=1200;input('c');time+=600;press();await wait(()=>!!processingCallback);
   check('Your Type:Q3 후 자동 저장 ·빈 답변 거부 ·처리중 Enter 무시 ·5초 타이머',()=>{
     assert(w.HelloQuestions.store.records.length===2&&T.diagnostics().state==='processing');press();assert(T.diagnostics().state==='processing'&&K.processingMs===5000);

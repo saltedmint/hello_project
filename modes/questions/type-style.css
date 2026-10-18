@@ -42,3 +42,24 @@ body.type-audience #mode-b{min-height:100dvh;background:#000}
 #yt-graphics .q-word-boundary,#yt-graphics .q-jamo-boundary{border:0}
 #yt-graphics .q-unsupported{color:#888}
 @media(prefers-reduced-motion:reduce){#yt-decoration{opacity:.5}}
+#yt-touch-start{pointer-events:auto;cursor:pointer}
+.yt-brand #yt-consent{max-width:460px;padding:0 22px;font-size:11px;line-height:1.8;letter-spacing:0;color:#777;text-align:center;margin:0 0 12px}
+.yt-brand #yt-online-status{font-size:11px;max-width:75vw;line-height:1.6;letter-spacing:0;color:#888;text-align:center;margin:0 0 8px}
+#yt-send-retry{pointer-events:auto}
+#yt-next{margin-top:20px;min-width:80px;min-height:42px}
+#type-experience #yt-return-prompt{border:0;background:#000;font-size:15px;padding:24px}
+.type-public #yt-settings .yt-setting-actions,.type-public #yt-demo-count,.type-public #yt-settings label:has(#yt-include-demo){display:none}
+.type-public #q-operator{display:none!important}
+#yt-question{min-height:var(--yt-viewport-height,100dvh)}
+@media(max-width:600px),(max-height:600px){
+  .yt-brand h1{font-size:clamp(64px,18vw,110px);margin-bottom:24px}
+  .yt-brand p{font-size:13px;margin-bottom:22px}
+  #yt-settings{bottom:12px;right:12px;width:min(310px,80vw)}
+  .yt-question-content{position:relative;left:auto;top:auto;transform:none;margin:0 auto;width:88vw;padding:24px 0 28px}
+  #yt-question{display:flex;align-items:center;justify-content:center}
+  #yt-prompt-ko{font-size:22px;line-height:1.6}
+  #yt-prompt-en{font-size:15px;line-height:1.5;margin-bottom:18px}
+  #yt-answer{font-size:20px;line-height:1.6;padding:10px 6px}
+  #yt-feedback{left:6%;width:88%;bottom:12px;font-size:11px}
+  .yt-brand #yt-consent{max-width:300px;font-size:10px}
+}

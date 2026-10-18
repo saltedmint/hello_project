@@ -8,6 +8,8 @@
   let mainStart=0,silentDecor=[],nextSilent=0;
   let questionTimer=null,endingTimer=null,typingPlayed=0,blackoutStarted=0;
   let pendingSubmit=null,submitTimer=null;
+  const online=globalThis.HelloTypeOnline;
+  let resultRecords=null;
   function cancelSubmit(){clearTimeout(submitTimer);submitTimer=null;pendingSubmit=null;}
   function settleSubmit(){
     if(!pendingSubmit||recorder?.composing||submitTimer!==null)return;
@@ -28,6 +30,7 @@
     $('yt-processing').hidden=next!=='processing';$('yt-result').hidden=next!=='playing';
     $('yt-ending').hidden=!['blackout','ended'].includes(next);$('yt-return-prompt').hidden=next!=='ended';
     $('yt-feedback').hidden=['playing','blackout','ended'].includes(next);
+    $('yt-next').textContent=index===2?'완료':'다음';$('yt-next').disabled=!isQuestion()||locked;
   }
   function cancelResults(){generation++;clearTimeout(processingTimer);processingTimer=null;clearTimeout(questionTimer);questionTimer=null;clearTimeout(endingTimer);endingTimer=null;sound.stopTyping();player.stop();sequence=null;ready=false;shown=-1;rendered=[];}
   function refreshSettings(){
@@ -36,14 +39,15 @@
   }
   function main(){
     cancelSubmit();
-    cancelResults();session=null;recorder=null;settings=null;locked=false;$('yt-answer').value='';
+    cancelResults();session=null;recorder=null;settings=null;resultRecords=null;locked=false;$('yt-answer').value='';
     $('yt-processing-error').hidden=true;$('yt-settings').open=false;screen('main');message(store.warning||'');refreshSettings();
     mainStart=now();nextSilent=0;silentDecor=Array.from({length:8},(_,i)=>({when:-i*1.8-.5,dash:Math.random()>.5,y:12+Math.random()*76}));sound.setMain(true);
   }
-  function begin(){
+  async function begin(){
     if(state!=='main'||locked)return;
-    if(store.records.length>=C.maxParticipants){message('저장 한도 20명입니다. 설정에서 JSON으로 백업하고 발표용 더미 배치 등을 정리한 뒤 시작해 주세요. 기존 기록은 지우지 않았습니다.');return;}
-    settings=Object.freeze({expression:$('yt-expression').value,includeDemo:$('yt-include-demo').checked,volume:Number($('yt-volume').value),muted:$('yt-muted').checked});
+    if(!online?.enabled&&store.records.length>=C.maxParticipants){message('저장 한도 20명입니다. 설정에서 JSON으로 백업하고 발표용 더미 배치 등을 정리한 뒤 시작해 주세요. 기존 기록은 지우지 않았습니다.');return;}
+    if(online?.enabled){locked=true;const token=generation;await online.initialize(true);if(!active||operator||token!==generation||state!=='main')return;locked=false;}
+    settings=Object.freeze({expression:$('yt-expression').value,includeDemo:online?.enabled?!!online.getRound().includeDemo:$('yt-include-demo').checked,preserveEdges:!!online?.enabled,roundId:online?.getRound().id,volume:Number($('yt-volume').value),muted:$('yt-muted').checked});
     sound.setVolume(settings.volume,settings.muted);sound.setMain(false);$('yt-settings').open=false;
     session={id:HelloRecording.newId(),answers:[],record:null};message('');openQuestion(0);
   }
@@ -58,7 +62,7 @@
     const activate=()=>{
       if(!active||operator||token!==generation||state!==q.id)return;
       if(now()<readyAt){requestAnimationFrame(activate);return;}
-      recorder=new HelloQuestionInput.Recorder(now());area.disabled=false;locked=false;area.focus();
+      recorder=new HelloQuestionInput.Recorder(now());area.disabled=false;locked=false;$('yt-next').disabled=false;area.focus();
     };
     const chars=Array.from(q.ko);let count=0;
     const reveal=()=>{
@@ -91,12 +95,18 @@
   function process(){
     cancelResults();locked=true;sound.setMain(false);screen('processing');message('');$('yt-processing-error').hidden=true;
     const token=generation;
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>requestAnimationFrame(async()=>{
       if(!active||operator||token!==generation)return;processingStarted=now();
       try{
-        store.add([session.record]); // Q3 completion, exactly once by ID. Retry also persists memory-only saves.
-        if(store.warning)throw Error(store.warning);
-        sequence=HelloTypeSequence.build(session.record,store.getRecords(),settings);ready=true;
+        if(online?.enabled){
+          resultRecords=await online.prepare(session.record,settings.roundId);
+          if(token!==generation||!active||operator)return;
+          message(online.getStatus());
+        }else {
+          store.add([session.record]); // Q3 completion, exactly once by ID.
+          if(store.warning)throw Error(store.warning);
+        }
+        sequence=HelloTypeSequence.build(session.record,resultRecords??store.getRecords(),settings);ready=true;
         processingTimer=setTimeout(()=>{
           processingTimer=null;if(token!==generation||!active||operator||!ready)return;
           if(!document.hidden)startResults();
@@ -109,7 +119,7 @@
     const token=generation;
     try{
       // Reconfirm the participants at result start; future mutations cannot affect this clone.
-      sequence=HelloTypeSequence.build(session.record,store.getRecords(),settings);
+      sequence=HelloTypeSequence.build(session.record,resultRecords??store.getRecords(),settings);
       if(sound.enabled){
         sound.ensureOutput();player.context=sound.context;player.output=sound.resultBus;player.setVolume(1);
         await player.start(sequence,()=>finishResults());
@@ -138,7 +148,7 @@
         for(const e of score.events){const dot=V.element('i','q-typing-dot');dot.style.left=`${e.atMs*C.pixelsPerMs*K.visualZoom}px`;dot.dataset.activity=e.activityIndex;track.append(dot);}scroll.append(track);node.append(scroll);
       }else {
         score=item.score;
-        node=V.row(item.record,item.answer,{expression:item.expression,zoom:K.visualZoom,score});
+        node=V.row(item.record,item.record.publicScoreVersion?{...item.answer,question:{ko:''},morse:score,characters:[],focusLoss:[]}:item.answer,{expression:item.expression,zoom:K.visualZoom,score});
         node.querySelectorAll('.q-row-label,.q-timing-source,.q-playhead').forEach(n=>n.remove());
       }
       // No question/answer text, labels, tooltips or operational numbers on this screen.
@@ -202,24 +212,24 @@
     }
     if(event.repeat||enterHeld){event.preventDefault();return;}enterHeld=true;
     if(isQuestion()&&!locked&&event.target===$('yt-answer')&&recorder){
-      if(event.isComposing||recorder.composing){
-        // The same Enter confirms the native IME and requests one submission.
-        pendingSubmit={recorder,generation};settleSubmit();return;
-      }
+      // IME Enter confirms only. A fresh Enter or the Next button submits.
+      if(event.isComposing||recorder.composing||event.keyCode===229)return;
       event.preventDefault();submit();return;
     }
     if(event.isComposing||event.keyCode===229)return;
     event.preventDefault();
     if(locked)return;
-    if(state==='main')begin();else if(isQuestion()&&event.target===$('yt-answer'))submit();else if(state==='ended')main();
+    if(state==='main'){if(online?.enabled)sound.enable().then(refreshSettings).catch(()=>{});begin();}else if(isQuestion()&&event.target===$('yt-answer'))submit();else if(state==='ended')main();
   }
   function bind(target,type,handler,options){target.addEventListener(type,handler,options);bindings.push(()=>target.removeEventListener(type,handler,options));}
   function rollback(result){if(result?.blocked){$('yt-answer').value=recorder.text;message(result.reason==='answer-too-long'?`답변은 ${C.maxCharacters}자 이내로 입력해 주세요. 기존 답변은 유지했습니다.`:'한 번에 여러 글자를 넣는 붙여넣기·자동완성은 기록하지 않습니다. 직접 입력해 주세요.');}}
   function enter(){
     if(active)return;active=true;operator=false;enterHeld=false;document.body.classList.add('type-audience');document.body.classList.remove('type-operator');$('q-operator').hidden=true;$('type-experience').hidden=false;
     main();
+    if(online?.enabled){document.body.classList.add('type-public');online.initialize();}
     if(sound.enabled)sound.enable().catch(()=>message('사운드를 활성화하지 못했습니다. 무음으로 진행할 수 있습니다.'));
     const area=$('yt-answer');
+    if(window.visualViewport){const resize=()=>document.documentElement.style.setProperty('--yt-viewport-height',`${window.visualViewport.height}px`);bind(window.visualViewport,'resize',resize);resize();}
     bind(document,'keydown',onKey,true);
     bind(document,'keyup',event=>{if(event.key==='Enter'||event.code==='Enter'||event.code==='NumpadEnter')enterHeld=false;else if(isQuestion()&&recorder&&event.target===area)recorder.keyUp(now());});
     bind(area,'beforeinput',event=>{
@@ -248,14 +258,20 @@
   function leave(){
     cancelSubmit();
     active=false;cancelResults();cancelAnimationFrame(frame);frame=null;bindings.forEach(remove=>remove());bindings=[];sound.stopAll();
-    if(operator)HelloQuestions.leave();operator=false;recorder=null;locked=false;document.body.classList.remove('type-audience','type-operator');
+    if(operator)HelloQuestions.leave();operator=false;recorder=null;locked=false;document.body.classList.remove('type-audience','type-operator','type-public');
   }
   function openOperator(){
+    if(online?.enabled)return;
     if(!active||state!=='main')return;cancelResults();cancelAnimationFrame(frame);frame=null;sound.stopAll();operator=true;
     document.body.classList.remove('type-audience');document.body.classList.add('type-operator');$('type-experience').hidden=true;$('q-operator').hidden=false;HelloQuestions.enter();
   }
   function closeOperator(){if(!operator)return;leave();enter();}
   $('yt-sound-enable').addEventListener('click',async()=>{try{if(await sound.enable())refreshSettings();}catch(error){message(`사운드 활성화 실패: ${error.message}. 무음으로 진행할 수 있습니다.`);}});
+  $('yt-touch-start').addEventListener('click',()=>{if(state!=='main'||locked)return;sound.enable().then(refreshSettings).catch(()=>message('사운드를 켜지 못했습니다. 무음으로 진행합니다.'));begin();});
+  $('yt-next').addEventListener('pointerdown',()=>{if(recorder?.composing){pendingSubmit={recorder,generation};$('yt-answer').blur();}});
+  $('yt-next').addEventListener('click',()=>{if(recorder?.composing){pendingSubmit={recorder,generation};$('yt-answer').blur();return;}if(pendingSubmit)settleSubmit();else submit();});
+  $('yt-return-prompt').addEventListener('click',()=>{if(state==='ended')main();});
+  $('yt-send-retry').addEventListener('click',()=>online?.retry());
   $('yt-expression').value='dots';
   const volume=()=>{if(active&&!operator&&state==='main')sound.setVolume($('yt-volume').value,$('yt-muted').checked);};
   $('yt-volume').addEventListener('input',volume);$('yt-muted').addEventListener('change',volume);

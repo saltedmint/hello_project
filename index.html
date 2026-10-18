@@ -31,6 +31,7 @@
   <script src="modes/questions/type-trim.js" defer></script>
   <script src="modes/questions/type-sequence.js" defer></script>
   <script src="modes/questions/type-sound.js" defer></script>
+  <script src="modes/questions/type-online.js" defer></script>
   <script src="modes/questions/type-experience.js" defer></script>
   <script src="app.js" defer></script>
 </head>
@@ -105,7 +106,7 @@
       <div id="type-experience" data-state="main">
         <section id="yt-main">
           <div id="yt-decoration" aria-hidden="true"></div>
-          <div class="yt-brand"><h1>Your Type</h1><p>엔터키를 눌러 시작하세요</p><button id="yt-sound-enable">사운드 켜기</button></div>
+          <div class="yt-brand"><h1 id="yt-touch-start" role="button" tabindex="0" aria-label="Your Type 체험 시작">Your Type</h1><p>엔터키를 누르거나 제목을 터치해 시작하세요</p><button id="yt-sound-enable">사운드 켜기</button><p id="yt-consent">답변과 입력 시간이 작품의 누적 결과에 사용됩니다.<br>이름·이메일은 수집하지 않습니다. 민감한 내용은 입력하지 마세요.</p><p id="yt-online-status" role="status"></p><button id="yt-send-retry" hidden>미전송 기록 다시 보내기</button></div>
           <details id="yt-settings"><summary>설정</summary>
             <label>답변 표현 <select id="yt-expression"><option selected value="dots">타이핑 점</option><option value="morse">모스</option></select></label>
             <label><input type="checkbox" id="yt-include-demo" checked>더미 포함</label>
@@ -118,14 +119,15 @@
         </section>
         <section id="yt-question" hidden>
           <div class="yt-question-content"><h2 id="yt-prompt-ko"></h2><p id="yt-prompt-en" lang="en"></p>
-            <textarea id="yt-answer" rows="2" maxlength="240" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="답변. 작성 후 Enter로 제출합니다." disabled></textarea>
+            <textarea id="yt-answer" rows="2" maxlength="240" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="답변. 작성 후 Enter 또는 다음 버튼으로 제출합니다." disabled></textarea>
+            <button id="yt-next" disabled>다음</button>
           </div>
         </section>
         <section id="yt-processing" hidden><p class="yt-processing-label">처리중</p>
           <div id="yt-processing-error" hidden><p id="yt-error-message" role="alert"></p><button id="yt-retry">다시 준비하기</button><button id="yt-backup">답변 JSON 보관</button></div>
         </section>
         <section id="yt-result" hidden aria-label="부호 그래픽 결과"><div id="yt-graphics"></div></section>
-        <section id="yt-ending" hidden><p id="yt-return-prompt" hidden>엔터키를 눌러 메인 화면으로 돌아가세요</p></section>
+        <section id="yt-ending" hidden><button id="yt-return-prompt" hidden>엔터키를 누르거나 터치해 메인 화면으로 돌아가세요</button></section>
         <p id="yt-feedback" role="status"></p>
       </div>
       <div id="q-operator" hidden><button id="yt-operator-back">← Your Type 메인</button>
