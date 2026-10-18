@@ -34,6 +34,12 @@ try{
  if(!sessionStorage.getItem('b-stage')){
    assert(b.getRecords().length===0&&!b.player.context);
    $('b-example-count').value='20';$('b-examples').click();assert(b.getRecords().length===20);
+   const assertOverview=()=>{
+     assert(document.body.classList.contains('soundscape-open'));
+     assert(document.documentElement.scrollHeight<=innerHeight+1);
+     assert([...$('b-records').children].every(row=>{const box=row.getBoundingClientRect();return box.top>=0&&box.bottom<=innerHeight&&box.height>=20;}));
+   };
+   assertOverview();
    sessionStorage.setItem('b-expected',JSON.stringify(b.getRecords()));
    const scheduled=[],originalSchedule=b.player.schedule.bind(b.player);
    b.player.schedule=(event,start)=>{scheduled.push({...event,cycleStart:start});originalSchedule(event,start);};
@@ -42,6 +48,7 @@ try{
    await wait(()=>b.diagnostics().voices>0);
    const cycle=b.player.current, clock=b.player.context;
    $('b-morse').click();assert(b.player.current===cycle&&b.player.context===clock);
+   assertOverview();
    assert($('b-records').querySelectorAll('.b-morse-group').length===260);
    const group=$('b-records').querySelector('.b-morse-group'), before=group.getBoundingClientRect();
    group.classList.add('b-sounding');const after=group.getBoundingClientRect();assert(before.width===after.width&&before.x===after.x);
@@ -88,7 +95,7 @@ def run(server, protocol):
             (profile / 'Default' / 'Preferences').write_text(json.dumps(preferences), encoding='utf-8')
             url = fixture.as_uri() if protocol == 'file' else f'http://127.0.0.1:{server.server_port}/{fixture.name}'
             process = subprocess.Popen([BROWSER, '--headless', '--disable-gpu', '--no-first-run', '--remote-debugging-port=0',
-                '--autoplay-policy=no-user-gesture-required', '--user-data-dir='+str(profile), url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                '--autoplay-policy=no-user-gesture-required', '--window-size=1280,800', '--user-data-dir='+str(profile), url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             try:
                 if not finished.wait(25):
                     raise RuntimeError(f'{protocol}: B browser timeout')

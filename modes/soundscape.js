@@ -11,13 +11,16 @@
   function stop() {
     generation++; player.stop(); cancelAnimationFrame(frame); frame=null;
     $('b-records').querySelectorAll('.b-sounding').forEach(node=>node.classList.remove('b-sounding'));
+    $('b-records').querySelectorAll('.b-track-sounding').forEach(node=>node.classList.remove('b-track-sounding'));
     $('b-sound-start').disabled=!store.records.length; $('b-stop').disabled=true; $('b-playing').textContent='정지';
   }
   function animate() {
     $('b-records').querySelectorAll('.b-sounding').forEach(node=>node.classList.remove('b-sounding'));
+    $('b-records').querySelectorAll('.b-track-sounding').forEach(node=>node.classList.remove('b-track-sounding'));
     for (const event of player.highlights()) {
       const row=[...$('b-records').children].find(node=>node.dataset.id===event.id);
       row?.querySelector(`[data-index="${event.index}"]`)?.classList.add('b-sounding');
+      row?.classList.add('b-track-sounding');
     }
     if(active&&player.running) frame=requestAnimationFrame(animate);
   }
@@ -26,7 +29,8 @@
     try {
       await player.start(selection());
       if(token!==generation||!active)return;
-      $('b-stop').disabled=false; $('b-playing').textContent=id?'한 기록 재생 중':'전체 재생 중';
+      $('b-stop').disabled=false; $('b-sound-start').disabled=!id;
+      $('b-playing').textContent=id?'한 트랙 재생 중 · 전체 듣기로 전환 가능':'전체 트랙 재생 중';
       message('고요한 풍경을 재생합니다. 변경은 다음 반복 경계에서 반영됩니다.'); animate();
     } catch(error) {if(token===generation){stop();message(`재생 실패: ${error.message}`);}}
   }
@@ -42,16 +46,18 @@
   }
   function render() {
     const records=store.getRecords(), list=$('b-records'); list.replaceChildren();
+    list.style.setProperty('--track-count',String(Math.max(1,records.length)));
     $('b-record-count').textContent=`${records.length} / ${D.LIMIT}개 기록`;
-    $('b-sound-start').disabled=player.running||!records.length; $('b-download').disabled=!records.length;
+    $('b-sound-start').disabled=(player.running&&!solo)||!records.length; $('b-download').disabled=!records.length;
     records.forEach((record,index)=>{
       const item=document.createElement('li'); item.dataset.id=record.id; item.className='b-record';
       item.style.setProperty('--age-opacity',String(Math.max(.58,1-(records.length-1-index)*.025)));
       const top=document.createElement('div'); top.className='b-record-heading';
       const title=document.createElement('span'); title.textContent=`${String(index+1).padStart(2,'0')} · ${record.source==='example'?'예시 · 실제 참여자 아님':'이 기기의 기록'} · ${(record.durationMs/1000).toFixed(2)}초`;
+      title.title=title.textContent;
       top.append(title);
-      for(const [label,action] of [['한 기록만 듣기',()=>start(record.id)],['제거',()=>{store.remove(record.id);changed();}]]){
-        const button=document.createElement('button');button.textContent=label;button.addEventListener('click',action);top.append(button);
+      for(const [label,symbol,action] of [['한 기록만 듣기','▶',()=>start(record.id)],['제거','×',()=>{store.remove(record.id);changed();}]]){
+        const button=document.createElement('button');button.textContent=symbol;button.title=label;button.setAttribute('aria-label',`${title.textContent} · ${label}`);button.addEventListener('click',action);top.append(button);
       }
       item.append(top,V.render(record,kind));list.append(item);
     });

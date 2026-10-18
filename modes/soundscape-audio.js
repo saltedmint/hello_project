@@ -1,7 +1,7 @@
 /* Shared audio clock, bounded lookahead, cycle-boundary changes. */
 (() => {
   'use strict';
-  const SETTINGS = Object.freeze({attack:.03,release:.5,minimumPeriod:12,tailGap:2,lookahead:.15,tickMs:25,joinFade:.8,masterMax:.22});
+  const SETTINGS = Object.freeze({attack:.03,release:.5,minimumPeriod:12,tailGap:2,lookahead:.15,tickMs:25,joinFade:.8,masterMax:.65,defaultVolume:.65,layerGain:.4,notePeak:.32});
   const periodFor = records => Math.max(SETTINGS.minimumPeriod,...records.map(r => r.durationMs/1000+SETTINGS.tailGap));
   function plan(records, start = 0) {
     const period = periodFor(records);
@@ -12,7 +12,7 @@
     return {start,end:start+period,period,records,events,cursor:0};
   }
   class Player {
-    constructor() { this.context = null; this.running = false; this.desired = []; this.voices = new Set(); this.layers = new Map(); this.timer = null; this.current = null; this.next = null; this.generation = 0; this.volume = .5; }
+    constructor() { this.context = null; this.running = false; this.desired = []; this.voices = new Set(); this.layers = new Map(); this.timer = null; this.current = null; this.next = null; this.generation = 0; this.volume = SETTINGS.defaultVolume; }
     setRecords(records) {
       this.desired = records.map(HelloSoundscapeData.validate);
       if (this.running && this.next && this.context.currentTime < this.next.start) {
@@ -46,7 +46,7 @@
       this.master.connect(this.compressor).connect(this.context.destination);
     }
     configureLayers(cycle) {
-      const target = .22/Math.sqrt(Math.max(1,cycle.records.length)), ids = new Set(cycle.records.map(r=>r.id));
+      const target = SETTINGS.layerGain/Math.sqrt(Math.max(1,cycle.records.length)), ids = new Set(cycle.records.map(r=>r.id));
       for (const record of cycle.records) {
         let layer = this.layers.get(record.id);
         if (!layer) {
@@ -68,7 +68,7 @@
       const source = this.context.createOscillator(), gain = this.context.createGain();
       source.type = 'sine'; source.frequency.value = 440 * 2 ** ((event.midi-69)/12);
       const start = Math.max(event.time,this.context.currentTime);
-      gain.gain.setValueAtTime(0,start); gain.gain.linearRampToValueAtTime(.24,start+SETTINGS.attack);
+      gain.gain.setValueAtTime(0,start); gain.gain.linearRampToValueAtTime(SETTINGS.notePeak,start+SETTINGS.attack);
       gain.gain.exponentialRampToValueAtTime(.0001,start+SETTINGS.attack+SETTINGS.release);
       source.connect(gain).connect(this.layers.get(event.id).gain);
       const voice = {source,gain,cycleStart,id:event.id}; this.voices.add(voice);

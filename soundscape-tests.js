@@ -104,6 +104,16 @@ globalThis.runSoundscapeTests = async ({check,assert,same,frame}) => {
     rp.stop();
   }
   check('B 합산 음량:20레이어 피크가 1레이어의3배 미만',()=>assert(peaks[3]<peaks[0]*3));
+  {
+    const offline=new OfflineAudioContext(2,44100*2,44100),rp=new A.Player();rp.context=offline;rp.volume=1;rp.connectOutput();
+    const records=D.examples(20).map(r=>D.create(Array.from({length:14},(_,i)=>i*.1),r.id));
+    records.forEach(r=>{r.b={midi:60,pan:0,startFraction:0};});
+    const cycle=A.plan(records,.1);rp.configureLayers(cycle);cycle.events.forEach(e=>rp.schedule(e,cycle.start));
+    const buffer=await offline.startRendering();let peak=0;
+    for(let c=0;c<2;c++)for(const value of buffer.getChannelData(c))peak=Math.max(peak,Math.abs(value));
+    check(`B 음량 상향:20개 동일 음높이·260음 동시 집중도 클리핑 없음 (peak ${peak.toFixed(3)})`,()=>assert(peak>0&&peak<.98));
+    rp.stop();
+  }
   b.store.clear();w.HelloExperiments.selectMode('b');b.setRecords([]);b.player.context=fakeContext();
   let now=1000;const oldNow=w.performance.now.bind(w.performance);Object.defineProperty(w.performance,'now',{configurable:true,value:()=>now});
   const type=(letter,extra={})=>{for(const type of ['keydown','keyup'])$('b-input-zone').dispatchEvent(new w.KeyboardEvent(type,{...key(letter,extra),bubbles:true,cancelable:true}));};
@@ -124,6 +134,12 @@ globalThis.runSoundscapeTests = async ({check,assert,same,frame}) => {
     const letter=$('b-records').querySelector('.b-letter'),before=letter.getBoundingClientRect();letter.classList.add('b-sounding');const after=letter.getBoundingClientRect();assert(before.x===after.x&&before.width===after.width&&before.height===after.height);letter.classList.remove('b-sounding');
   });
   $('b-stop').click();check('B 정지UI:예약·RAF 취소 ·재시작 가능',()=>assert(!b.diagnostics().running&&b.diagnostics().voices===0&&b.diagnostics().frame===null&&!$('b-sound-start').disabled));
+  b.addRecords([record]);$('b-records').firstElementChild.querySelector('button').click();
+  await Promise.resolve();await Promise.resolve();await Promise.resolve();
+  check('B 개별→전체:개별 재생 중에도 전체 듣기 버튼 사용 가능',()=>assert(b.player.current.records.length===1&&!$('b-sound-start').disabled));
+  $('b-sound-start').click();await Promise.resolve();await Promise.resolve();await Promise.resolve();
+  check('B 전체 듣기:개별 모드를 해제하고 모든 트랙을 예약',()=>assert(b.player.current.records.length===2&&$('b-playing').textContent.includes('전체')));
+  $('b-stop').click();
   const beforeImport=JSON.stringify(b.getRecords()),transfer=new w.DataTransfer();transfer.items.add(new w.File(['{bad'],'bad.json',{type:'application/json'}));$('b-json-file').files=transfer.files;$('b-json-file').dispatchEvent(new w.Event('change'));
   for(let i=0;i<200&&!$('b-feedback').textContent.includes('실패');i++)await new Promise(resolve=>setTimeout(resolve,5));
   check('B 실제 파일UI:잘못된 JSON 안내 ·기존기록 유지',()=>assert($('b-feedback').textContent.includes('실패')&&JSON.stringify(b.getRecords())===beforeImport));

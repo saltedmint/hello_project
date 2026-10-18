@@ -85,6 +85,7 @@
     </section>
     </div>
     <section id="mode-b" hidden class="soundscape-entry" aria-labelledby="b-title">
+      <aside class="b-sidebar">
       <span class="eyebrow">B / A COLLECTIVE GREETING</span><h1 id="b-title">인사 사운드스케이프</h1>
       <p>같은 인사, 서로 다른 간격. 한 사람씩 입력하고 풍경에 보태 주세요.<br>입력은 조용하게 기록합니다. 공백도 당신의 리듬입니다.</p>
       <section class="b-input-panel" aria-label="인사 입력">
@@ -94,14 +95,19 @@
         <div id="b-preview" hidden aria-label="나의 입력 미리보기"></div>
       </section>
       <p id="b-feedback" role="status">한 기기에서 차례로 참여합니다. 최대 20개의 기록을 이 브라우저에 저장합니다.</p>
+      <details class="b-tools"><summary>예시 · JSON · 기록 관리</summary>
+      <div class="b-storage b-actions"><label>시험할 예시 수 <select id="b-example-count"><option>1</option><option>5</option><option selected>10</option><option>20</option></select></label><button id="b-examples">예시 기록 불러오기</button><button id="b-download" disabled>전체 기록 JSON 다운로드</button><button id="b-upload">전체 기록 JSON 불러오기</button><input id="b-json-file" type="file" accept=".json,application/json" hidden><button id="b-clear" class="quiet">전체 기록 삭제</button></div>
+      <p class="handwriting-hint">예시는 실제 참여 기록이 아닙니다. JSON 불러오기는 기존 기록에 추가하며 같은 ID는 중복하지 않습니다.<br>새로고침 후 기록은 복원되며 소리는 자동 재생하지 않습니다. 모스는 정확한 문자 부호에 타이핑 간격을 더한 시각화입니다.</p>
+      </details>
+      </aside>
+      <div class="b-stage">
       <div class="b-toolbar">
         <div class="b-actions" aria-label="시각화 선택"><button id="b-spacing" aria-pressed="true">자간</button><button id="b-morse" aria-pressed="false">모스</button></div>
-        <div class="b-actions"><button id="b-sound-start" class="primary" disabled>전체 듣기 · 사운드 시작</button><button id="b-stop" disabled>정지</button><label>마스터 음량 <input id="b-volume" type="range" min="0" max="1" step=".01" value=".5"></label><span id="b-playing" role="status">정지</span></div>
+        <div class="b-actions"><button id="b-sound-start" class="primary" disabled>전체 듣기 · 사운드 시작</button><button id="b-stop" disabled>정지</button><label>마스터 음량 <input id="b-volume" type="range" min="0" max="1" step=".01" value=".65"></label><span id="b-playing" role="status">정지</span></div>
       </div>
       <div class="b-collection-heading"><h2 id="b-record-count">0 / 20개 기록</h2><span>오래된 인사도 풍경 안에 남습니다.</span></div>
       <ul id="b-records" aria-label="누적된 사람별 인사 기록"></ul>
-      <div class="b-storage b-actions"><label>시험할 예시 수 <select id="b-example-count"><option>1</option><option>5</option><option selected>10</option><option>20</option></select></label><button id="b-examples">예시 기록 불러오기</button><button id="b-download" disabled>전체 기록 JSON 다운로드</button><button id="b-upload">전체 기록 JSON 불러오기</button><input id="b-json-file" type="file" accept=".json,application/json" hidden><button id="b-clear" class="quiet">전체 기록 삭제</button></div>
-      <p class="handwriting-hint">예시는 실제 참여 기록이 아닙니다. JSON 불러오기는 기존 기록에 추가하며 같은 ID는 중복하지 않습니다.<br>새로고침 후 기록은 복원되며 소리는 자동 재생하지 않습니다. 모스는 정확한 문자 부호에 타이핑 간격을 더한 시각화입니다.</p>
+      </div>
     </section>
     <footer><span>입력은 조용하게. 재생은 있는 그대로.</span><span>HELLO / RHYTHM</span></footer>
   </main>

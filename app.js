@@ -20,6 +20,7 @@
     $('mode-home').hidden = mode !== 'home'; $('mode-a').hidden = mode !== 'a'; $('mode-b').hidden = mode !== 'b';
     $('mode-nav').hidden = mode === 'home';
     document.querySelector('.record-tools').hidden = mode === 'b';
+    document.body.classList.toggle('soundscape-open',mode === 'b');
     $('nav-a').setAttribute('aria-current', mode === 'a' ? 'page' : 'false');
     $('nav-b').setAttribute('aria-current', mode === 'b' ? 'page' : 'false');
     if (mode === 'a') {
