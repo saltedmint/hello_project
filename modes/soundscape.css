@@ -41,6 +41,10 @@
 .b-morse-group.b-sounding i { background:#e9bd75; }
 @media(max-width:700px) { .b-input-panel{padding:16px;}#b-input-letters{font-size:34px;}.b-record{padding:15px;}.b-record-heading{flex-wrap:wrap;} }
 .b-tools { margin-top:22px; font-size:12px; }
+.b-random-panel { border-top:1px solid var(--line); padding-top:14px; margin-top:20px; }
+.b-random-panel #b-random-title { font-size:14px; margin:0 0 8px; }
+.b-random-panel p { font-size:11px; line-height:1.7; margin:0 0 12px; }
+.b-random-panel button { padding:8px 10px; font-size:11px; }
 .b-tools summary { cursor:pointer; color:var(--green); padding:10px 0; }
 .b-stage { min-width:0; }
 .b-track-sounding { box-shadow:inset 3px 0 #c67f26; }
@@ -54,12 +58,12 @@
   body.soundscape-open #mode-b { display:grid; grid-template-columns:240px minmax(0,1fr); gap:26px; flex:1; min-height:0; padding:0; }
   .b-sidebar { overflow-y:auto; min-height:0; padding:10px 6px 16px 0; }
   .b-sidebar .eyebrow { font-size:9px; }
-  .b-sidebar #b-title { font-size:26px; line-height:1.4; margin:14px 0; }
+  .b-sidebar #b-title { font-size:22px; line-height:1.4; margin:12px 0; }
   .b-sidebar > p { font-size:12px; }
   .b-sidebar .b-input-panel { padding:14px; margin-top:22px; }
   .b-sidebar #b-input-zone { padding:12px 0; }
   .b-sidebar #b-input-letters { font-size:25px; letter-spacing:1px; }
-  .b-sidebar .b-input-panel button { font-size:11px; padding:9px 10px; }
+  .b-sidebar .b-input-panel button { font-size:10px; padding:8px; }
   .b-sidebar #b-preview { margin-top:10px; padding:0; }
   .b-sidebar #b-feedback { font-size:11px; margin:16px 0; }
   .b-sidebar .b-storage { margin-top:10px; }
@@ -81,7 +85,7 @@
   .b-record-heading button { padding:0; width:25px; height:22px; font-size:11px; }
   .b-record-heading button:nth-child(2) { grid-column:3; grid-row:1; }
   .b-record-heading button:last-child { grid-column:4; grid-row:1; }
-  #b-records .b-phrase { grid-column:2; grid-row:1; min-width:0; height:100%; padding:0; scrollbar-width:thin; }
+  #b-records .b-phrase { grid-column:2; grid-row:1; min-width:0; height:100%; padding:0; scrollbar-width:thin; overflow-y:hidden; }
   #b-records .b-spacing { font-size:clamp(12px,calc((100dvh - 180px) / var(--track-count) * .65),28px); line-height:1.15; }
   #b-records .b-morse-group { height:16px; }
 }

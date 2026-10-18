@@ -162,5 +162,54 @@ globalThis.runSoundscapeTests = async ({check,assert,same,frame}) => {
     const before=group.getBoundingClientRect();group.classList.add('b-sounding');assert(group.getBoundingClientRect().width===before.width);
     assert($('b-records').lastElementChild.querySelector('.b-phrase').scrollWidth>$('b-records').lastElementChild.querySelector('.b-phrase').clientWidth);
   });
+  const randomTracks=D.randomSentences(20,12345), roundtrip=D.parse(D.serialize(randomTracks));
+  check('B 임의 문장:20개 서로 다른 길이의 문장 · 임의 간격 · 합성 표시',()=>{
+    assert(randomTracks.length===20&&new Set(randomTracks.map(r=>r.text)).size===20);
+    assert(new Set(randomTracks.map(r=>r.text.length)).size>5);
+    assert(randomTracks.every(r=>r.source==='example'&&r.b.testKind==='random-sentence'&&r.relativeTimesMs.length===r.text.length&&r.durationMs===r.relativeTimesMs.at(-1)&&!r.raw));
+    assert(randomTracks.some(r=>new Set(r.relativeTimesMs.slice(1).map((t,i)=>t-r.relativeTimesMs[i])).size>5));
+    same(D.randomSentences(20,12345),randomTracks);assert(JSON.stringify(D.randomSentences(20,12346))!==JSON.stringify(randomTracks));
+  });
+  check('B 임의 문장:JSON·로컬 복원 후 원본 타이밍·문장·배정·seed 유지',()=>{
+    same(roundtrip,randomTracks);const memory={text:null,getItem(){return this.text;},setItem(k,v){this.text=v;}};
+    const s=new D.Store(memory);s.addRecords(randomTracks);const restored=new D.Store(memory);same(restored.restore(),randomTracks);
+    same(A.plan(roundtrip).events,A.plan(randomTracks).events);
+  });
+  check('B 임의 문장:가변 길이 소리 개수·여러 공백·모스와 상대 시각 보존',()=>{
+    for(const r of randomTracks){
+      const events=A.plan([r],5).events,letters=Array.from(r.text).map((letter,index)=>({letter,index})).filter(e=>e.letter!==' ');
+      assert(events.length===letters.length&&V.groups(r).length===letters.length);
+      letters.forEach((letter,i)=>{assert(events[i].index===letter.index);assert(Math.abs(events[i].time-events[0].time-r.relativeTimesMs[letter.index]/1000)<1e-8);});
+      same(V.groups(r).map(g=>g.code),letters.map(e=>V.MORSE[e.letter]));
+    }
+  });
+  {
+    const cycle=A.plan(randomTracks,.1),offline=new OfflineAudioContext(2,Math.ceil((cycle.end+.1)*44100),44100),rp=new A.Player();
+    rp.context=offline;rp.connectOutput();rp.configureLayers(cycle);cycle.events.forEach(event=>rp.schedule(event,cycle.start));
+    const buffer=await offline.startRendering();let peak=0,energy=0;
+    for(let c=0;c<2;c++)for(const sample of buffer.getChannelData(c)){assert(Number.isFinite(sample));peak=Math.max(peak,Math.abs(sample));energy+=sample*sample;}
+    check(`B 임의 문장 실제 오디오:20문장 ·${cycle.events.length}음 ·무클리핑`,()=>assert(energy>0&&peak>0&&peak<1&&cycle.events.length===randomTracks.reduce((n,r)=>n+r.text.replaceAll(' ','').length,0)));
+    rp.stop();
+  }
+  check('B 임의 문장 검증:지원 안 하는 문자·길이·위조된 테스트 표시 거부',()=>{
+    for(const bad of [{...randomTracks[0],b:{...randomTracks[0].b,seed:-1}},{...randomTracks[0],source:'local'},
+      {...randomTracks[0],b:{...randomTracks[0].b,testKind:'unknown'}}, {...randomTracks[0],text:'hi!'}]){
+      let threw=false;try{D.validate(bad);}catch{threw=true;}assert(threw);
+    }
+  });
+  b.store.clear();b.addRecords([record]);const original=JSON.stringify(b.getRecords()[0]);$('b-random-count').value='20';$('b-random-tests').click();
+  check('B 임의 테스트 UI:남은19자리만 추가 · 기존 기록 보존 ·20개 한도',()=>{
+    assert(b.getRecords().length===20&&b.getRecords().filter(r=>r.b.testKind==='random-sentence').length===19);
+    assert(JSON.stringify(b.getRecords().find(r=>r.id===record.id))===original&&$('b-feedback').textContent.includes('일부만'));
+    $('b-random-tests').click();assert(b.getRecords().length===20&&$('b-feedback').textContent.includes('찼습니다'));
+    assert($('b-records').textContent.includes('임의 문장 테스트'));
+  });
+  $('b-clear-random').click();
+  check('B 임의 테스트 삭제:다른 예시·실제 기록은 그대로 보존',()=>assert(b.getRecords().length===1&&JSON.stringify(b.getRecords()[0])===original));
+  $('b-random-count').value='5';$('b-random-tests').click();
+  check('B 임의 테스트 재실행:새 트랙 생성 ·자간/모스 전환과 삭제 가능',()=>{
+    assert(b.getRecords().length===6);$('b-spacing').click();assert($('b-records').children.length===6);$('b-morse').click();
+    assert($('b-records').querySelectorAll('.b-morse-group').length===b.getRecords().reduce((n,r)=>n+r.text.replaceAll(' ','').length,0));
+  });
   Object.defineProperty(w.performance,'now',{configurable:true,value:oldNow});b.store.clear();w.HelloExperiments.selectMode('home');
 };

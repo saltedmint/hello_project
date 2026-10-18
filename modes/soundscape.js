@@ -53,8 +53,8 @@
       const item=document.createElement('li'); item.dataset.id=record.id; item.className='b-record';
       item.style.setProperty('--age-opacity',String(Math.max(.58,1-(records.length-1-index)*.025)));
       const top=document.createElement('div'); top.className='b-record-heading';
-      const title=document.createElement('span'); title.textContent=`${String(index+1).padStart(2,'0')} · ${record.source==='example'?'예시 · 실제 참여자 아님':'이 기기의 기록'} · ${(record.durationMs/1000).toFixed(2)}초`;
-      title.title=title.textContent;
+      const title=document.createElement('span'); title.textContent=`${String(index+1).padStart(2,'0')} · ${record.b.testKind==='random-sentence'?'임의 문장 테스트 · 실제 참여자 아님':record.source==='example'?'예시 · 실제 참여자 아님':'이 기기의 기록'} · ${(record.durationMs/1000).toFixed(2)}초`;
+      title.title=`${title.textContent} · ${record.text}`;
       top.append(title);
       for(const [label,symbol,action] of [['한 기록만 듣기','▶',()=>start(record.id)],['제거','×',()=>{store.remove(record.id);changed();}]]){
         const button=document.createElement('button');button.textContent=symbol;button.title=label;button.setAttribute('aria-label',`${title.textContent} · ${label}`);button.addEventListener('click',action);top.append(button);
@@ -79,7 +79,7 @@
   function listen(target,type,handler){target.addEventListener(type,handler);bindings.push(()=>target.removeEventListener(type,handler));}
   function enter(records=[]){
     if(active)return;active=true;
-    const matching=records.filter(r=>r.text===D.TEXT&&r.b);
+    const matching=records.filter(r=>r.b);
     if(matching.length)try{store.addRecords(matching);}catch(error){message(error.message);}
     listen($('b-input-zone'),'keydown',event=>{
       if(!recorder.active)return;event.preventDefault();if(composing)return;
@@ -115,6 +115,16 @@
     try{const count=addRecords(D.examples(Number($('b-example-count').value)));message(store.warning||`${count}개 예시를 추가했습니다. 예시는 실제 참여 기록이 아닙니다. 중복 예시는 추가하지 않습니다.`);}
     catch(error){message(error.message);}
   });
+  $('b-random-tests').addEventListener('click',()=>{
+    try {
+      const available=D.LIMIT-store.records.length;
+      if(!available)throw new Error('20개 트랙이 모두 찼습니다. 기존 트랙을 제거한 뒤 테스트를 추가해 주세요.');
+      const requested=Number($('b-random-count').value), records=D.randomSentences(requested).slice(0,available);
+      const added=addRecords(records);
+      message(store.warning||`서로 다른 문장·임의 간격의 합성 테스트 ${added}개를 추가했습니다.${added<requested?' 남은 공간에 맞춰 일부만 추가했습니다.':''} ${player.running?'다음 반복 경계에서 합류합니다.':'‘전체 듣기’로 들어보세요.'}`);
+    }catch(error){message(error.message);}
+  });
+  $('b-clear-random').addEventListener('click',()=>{store.removeRandomTests();changed();message(store.warning||'임의 문장 테스트만 삭제했습니다. 다른 기록은 유지했습니다.');});
   $('b-download').addEventListener('click',()=>{
     const url=URL.createObjectURL(new Blob([D.serialize(store.getRecords())],{type:'application/json'}));
     const link=document.createElement('a');link.href=url;link.download='greeting-soundscape.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
@@ -133,7 +143,7 @@
     if(window.confirm('이 기기에 저장한 B 기록을 모두 삭제할까요? A 기록은 유지됩니다.')){stop();store.clear();changed();}
   });
   globalThis.HelloSoundscape={enter,leave,addRecords,
-    setRecords(records){const matching=records.filter(r=>r.text===D.TEXT&&r.b);if(matching.length)addRecords(matching);},
+    setRecords(records){const matching=records.filter(r=>r.b);if(matching.length)addRecords(matching);},
     getRecords:()=>store.getRecords(),
     diagnostics:()=>({active,audioImplemented:true,inputBindings:bindings.length,frame,...player.diagnostics()}),player,store};
 })();
