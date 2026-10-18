@@ -21,6 +21,8 @@
   <script src="modes/questions/morse.js" defer></script>
   <script src="modes/questions/data.js" defer></script>
   <script src="modes/questions/examples.js" defer></script>
+  <script src="modes/questions/dots.js" defer></script>
+  <script src="modes/questions/demo-seed.js" defer></script>
   <script src="modes/questions/audio.js" defer></script>
   <script src="modes/questions/visual.js" defer></script>
   <script src="modes/questions/controller.js" defer></script>
@@ -121,18 +123,23 @@
         </div>
         <div class="q-presentation-controls">
           <label>비교 <select id="q-person"><option value="all">여러 관객 · 같은 질문 비교</option></select></label>
+          <label>표현 <select id="q-expression"><option value="morse">모스 모드</option><option value="dots">타이핑 점 모드</option></select></label>
+          <label>기록 <select id="q-data-filter"><option value="all">함께 보기</option><option value="demo">더미만 보기</option><option value="actual">실제만 보기</option></select></label>
+          <label>질문 <select id="q-question-selection"><option value="all">전체 질문</option><option value="Q1">Q1</option><option value="Q2">Q2</option><option value="Q3">Q3</option></select></label>
+          <label>점 확대 <select id="q-zoom" disabled><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select></label>
           <label>시간축 <select id="q-axis"><option value="morse">모스 변환 결과</option><option value="original">원본 시간축</option></select></label>
           <label>공통 속도 <select id="q-speed"><option value=".5">0.5×</option><option selected value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label><span id="q-rate">모든 질문 1×</span>
           <label>음량 <input id="q-volume" type="range" min="0" max="1" step=".01" value=".65"></label>
           <label><input id="q-follow" type="checkbox" checked>재생 위치 따라가기</label>
           <button id="q-play-all">Q1 → Q2 → Q3 듣기</button><button id="q-stop" disabled>정지</button><span id="q-audio-status" role="status">정지</span>
         </div>
-        <p class="q-small">같은 질문의 시작을 맞춥니다. 부호를 읽는 시간에 실제 침묵을 더한 변환이며 원본 타이핑의 실시간 복제는 아닙니다.<br>원본 시간축의 빗금은 포커스 이탈입니다. 미지원 문자는 ◇로 남깁니다. 긴 행은 가로로 이동할 수 있습니다.</p>
+        <p id="q-expression-note" class="q-small">같은 질문의 시작을 맞춥니다. 부호를 읽는 시간에 실제 침묵을 더한 변환이며 원본 타이핑의 실시간 복제는 아닙니다. 원본 시간축의 빗금은 포커스 이탈이며 미지원 문자는 ◇로 남깁니다. 긴 행은 가로로 이동할 수 있습니다.</p>
+        <p id="q-demo-notice" class="q-small" hidden>발표용 합성 데이터가 포함되어 있습니다. 실제 관객의 응답이나 일반적인 심리 패턴을 나타내지 않습니다.</p>
         <div id="q-board" aria-label="Q1 Q2 Q3 응답의 시간과 모스"></div><div id="q-own-details"></div>
       </section>
       <p id="q-feedback" role="status">한국어 또는 영어로, 당신의 시간에 답해 주세요.</p>
       <details id="q-tools"><summary>발표 · 운영 도구</summary>
-        <div class="q-actions"><button id="q-open-landscape">운영: 누적 풍경 보기</button><button id="q-load-examples">발표용 합성 예시 6명 불러오기</button><button id="q-remove-examples">합성 예시만 제거</button><button id="q-download">질문 기록 JSON 다운로드</button><button id="q-upload">질문 기록 JSON 불러오기</button><input id="q-file" type="file" accept=".json,application/json" hidden><button id="q-clear">질문 기록 전체 삭제</button></div>
+        <div class="q-actions"><button id="q-open-landscape">운영: 누적 풍경 보기</button><button id="q-seed-demo">발표용 합성 데이터 10명 등록</button><button id="q-remove-demo">발표 배치 10명만 제거</button><span id="q-demo-count"></span><button id="q-load-examples">기존 합성 예시 6명 불러오기</button><button id="q-remove-examples">기존 6명 예시만 제거</button><button id="q-download">질문 기록 JSON 다운로드</button><button id="q-upload">질문 기록 JSON 불러오기</button><input id="q-file" type="file" accept=".json,application/json" hidden><button id="q-clear">질문 기록 전체 삭제</button></div>
         <label><input id="q-show-original" type="checkbox">운영자 확인: 원문을 누적 화면에 표시</label>
         <p class="q-small">합성 예시의 대기와 멈춤은 설명을 위한 시나리오이며 실제 관객의 일반적 패턴을 주장하지 않습니다.<br>예시에는 Q1에 오래 멈추거나 Q3에 빠르게 답한 경우도 포함합니다. 이전 B 자료는 상단 ‘이전 B 실험’에서 열 수 있습니다.</p>
       </details>

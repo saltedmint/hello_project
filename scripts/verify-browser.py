@@ -56,7 +56,7 @@ def run(mode, server):
                 "--remote-debugging-port=0", "--autoplay-policy=no-user-gesture-required",
                 "--user-data-dir=" + profile, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             try:
-                if not finished.wait(30):
+                if not finished.wait(60):
                     raise RuntimeError(f"{mode}: browser test timed out")
                 print(f"[{mode}]\n{reports[0]}", flush=True)
                 return "FAIL" not in reports[0] and "ERROR" not in reports[0]

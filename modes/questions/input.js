@@ -1,5 +1,5 @@
-/* DOM text edits, not physical keys. Both IME activity and surviving characters
-   are retained; a follow-up identical input after compositionend is a no-op. */
+/* DOM edits and confirmed text-key activity are separate. IME raw notifications
+   remain available; compositionend's following identical input adds no dot. */
 (() => {
   'use strict';
   const C=HelloQuestionConfig;
@@ -20,8 +20,40 @@
     const added=next.slice(prefix,next.length-suffix), removed=old.slice(prefix,old.length-suffix);
     return {added,removed,characters:[...previous.slice(0,prefix),...added.map(char=>({char,atMs})),...(suffix?previous.slice(-suffix):[])].map((c,index)=>({...c,index}))};
   }
+  // One canonical activity per observed insertion. Key timestamps are used only
+  // after an input confirms that the key actually produced text.
+  function collectTyping(events) {
+    const result=[];let key=null,observed='';
+    events.forEach((e,index)=>{
+      if(e.type==='keydown'){key={...e,index};return;}
+      if(e.type==='keyup'){key=null;return;}
+      if(e.type==='blocked'){key=null;return;}
+      if(!['input','compositionend'].includes(e.type)||typeof e.value!=='string')return;
+      const type=e.inputType||'insertCompositionText';
+      if(/delete/i.test(type)||['Backspace','Delete'].includes(key?.key)||['Backspace','Delete'].includes(key?.code)){observed=e.value;key=null;return;}
+      if(!['input','insertText','insertCompositionText','insertFromComposition'].includes(type)){key=null;return;}
+      const edit=editCharacters(Array.from(observed).map(char=>({char})),e.value,0);
+      const blocked=events.slice(index+1,index+5).some(n=>n.atMs===e.atMs&&n.type==='blocked');
+      const physical=key?.eligible&&!key.repeat&&key.atMs<=e.atMs;
+      const insertion=edit.added.length===1&&e.value!==observed;
+      const sameValueHit=physical&&e.type==='input'&&e.value===observed;
+      if((insertion||sameValueHit)&&!key?.repeat&&!blocked&&Array.from(e.value).length<=C.maxCharacters){
+        result.push({atMs:physical?key.atMs:e.atMs,eventIndex:index,keyEventIndex:physical?key.index:null,unit:physical?'physical-key':'observed-input'});
+      }
+      // compositionend and its following input carry the same value: no double hit.
+      if(!blocked&&edit.added.length<=1)observed=e.value;
+      key=null;
+    });
+    return result;
+  }
   class Recorder {
-    constructor(origin) { this.origin=origin;this.text='';this.characters=[];this.events=[];this.composing=false;this.firstActivityMs=null;this.lastTextInputMs=null;this.focusLoss=[];this.openFocus=null; }
+    constructor(origin,{recordingVersion=C.recordingVersion}={}) { this.recordingVersion=recordingVersion;this.origin=origin;this.text='';this.characters=[];this.events=[];this.composing=false;this.firstActivityMs=null;this.lastTextInputMs=null;this.focusLoss=[];this.openFocus=null; }
+    keyDown(event,now) {
+      const key=event.key||'',code=event.code||'';
+      const eligible=!event.ctrlKey&&!event.metaKey&&!event.altKey&&(Array.from(key).length===1||((key==='Process'||event.keyCode===229)&&/^(Key[A-Z]|Digit[0-9]|Space|Semicolon|Quote|Bracket|Backslash|Comma|Period|Slash|Minus|Equal)/.test(code)));
+      this.log('keydown',now,{key,code,eligible,repeat:!!event.repeat});
+    }
+    keyUp(now){this.log('keyup',now);}
     elapsed(now) { return Math.max(0,now-this.origin); }
     log(type,now,fields={}) {
       const safe={...fields};
@@ -60,10 +92,11 @@
       if(!this.text.trim())throw Error('한국어 또는 영어로 짧게 답해 주세요.');
       if(this.events.length>10000)throw Error('입력 기록이 너무 큽니다. 이 질문을 다시 시작해 주세요.');
       this.gainFocus(now);
-      return {questionId:question.id,questionVersion:question.version,question:{ko:question.ko,en:question.en},recordingVersion:C.recordingVersion,
+      return {questionId:question.id,questionVersion:question.version,question:{ko:question.ko,en:question.en},recordingVersion:this.recordingVersion,
+        ...(this.recordingVersion==='dom-typing-v2'?{typingActivities:collectTyping(this.events)}:{}),
         text:this.text,characters:this.characters.map(c=>({...c})),events:JSON.parse(JSON.stringify(this.events)),
         firstActivityMs:this.firstActivityMs,lastTextInputMs:this.lastTextInputMs,submittedAtMs:this.elapsed(now),focusLoss:this.focusLoss.map(x=>({...x}))};
     }
   }
-  globalThis.HelloQuestionInput={Recorder,editCharacters};
+  globalThis.HelloQuestionInput={Recorder,editCharacters,collectTyping};
 })();

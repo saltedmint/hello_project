@@ -46,6 +46,12 @@ const type=async char=>{
 };
 try{
  $('choose-b').click();
+ if(sessionStorage.getItem('q-stage')==='dots-restore'){
+   assert(D.serialize(Q.store.getRecords())===sessionStorage.getItem('q-demo-expected'),'demo native reload');
+   assert(!Q.player.context&&!Q.player.running,'demo restore without autoplay');
+   assert(Q.store.records.length===17&&HelloQuestionDemo.query(Q.store).answers===30,'seed not duplicated on startup');
+   $('q-download').click();navigator.sendBeacon('ENDPOINT','PASS questions: Q1/Q2/Q3, synthetic IME, Morse live clock, demo 10/30 idempotent, prior 7 retained, native reload twice without autoplay/reseed, dots mode/filters/stop, native JSON');return;
+ }
  if(!sessionStorage.getItem('q-stage')){
    assert(!Q.player.context&&Q.store.records.length===0,'must not autoplay/create context');
    $('q-begin').click();assert(!$('q-intro').hidden,'intro');$('q-intro-start').click();
@@ -74,11 +80,23 @@ try{
    sessionStorage.setItem('q-expected',D.serialize(Q.store.getRecords()));sessionStorage.setItem('q-stage','restore');location.reload();return;
  }
  assert(D.serialize(Q.store.getRecords())===sessionStorage.getItem('q-expected'),'native reload');assert(!Q.player.context&&!Q.player.running,'restore without autoplay');assert(Q.diagnostics().state==='waiting','new visitor starts at waiting, not previous results');
- $('q-remove-examples').click();assert(Q.store.records.length===1,'remove examples preserves participant');
+ window.confirm=()=>true;$('q-remove-examples').click();assert(Q.store.records.length===1,'remove examples preserves participant');
  const transfer=new DataTransfer();transfer.items.add(new File([D.serialize(HelloQuestionExamples.examples())],'questions.json',{type:'application/json'}));
  $('q-file').files=transfer.files;$('q-file').dispatchEvent(new Event('change'));await wait(()=>Q.store.records.length===7);
  assert(D.serialize(Q.store.getRecords())===sessionStorage.getItem('q-expected'),'native file roundtrip');
- $('q-download').click();navigator.sendBeacon('ENDPOINT','PASS questions: full Q1/Q2/Q3 DOM flow, synthetic Korean IME, retained silences, 6 example participants, all own Morse tones on live audio clock, stop/mode cleanup, native reload and JSON import/download');
+ $('q-seed-demo').click();$('q-seed-demo').click();assert(Q.store.records.length===17,'ten seeded once, prior seven retained');
+ assert(HelloQuestionDemo.query(Q.store).participants===10&&HelloQuestionDemo.query(Q.store).answers===30,'query batch links');
+ const change=(id,value)=>{$(id).value=value;$(id).dispatchEvent(new Event('change'));};
+ change('q-data-filter','actual');assert($('q-board').querySelectorAll('.q-row').length===3,'actual filter');
+ change('q-data-filter','demo');assert($('q-board').querySelectorAll('.q-row').length===48,'demo filter includes previous examples');
+ const demo=Q.store.records.find(r=>r.demoBatchId);change('q-person',demo.id);change('q-question-selection','Q2');
+ $('q-play-all').click();await wait(()=>Q.player.running);change('q-expression','dots');
+ assert(!Q.player.running&&Q.player.voices.size===0&&Q.player.timer===null&&Q.diagnostics().frame===null,'expression switch cancels everything');
+ assert($('q-person').value===demo.id&&$('q-question-selection').value==='Q2'&&$('q-data-filter').value==='demo','selection preserved');
+ $('q-play-all').click();await wait(()=>Q.player.running);const dotPlan=Q.player.plan,answer=demo.answers[1];
+ assert(dotPlan.events.length===answer.typingActivities.length&&dotPlan.events.every((e,i)=>e.atMs===answer.typingActivities[i].atMs&&e.durationMs===80),'raw dots timing and count');
+ await wait(()=>Q.player.voices.size>0);$('q-stop').click();assert(Q.player.voices.size===0&&Q.player.timer===null&&Q.diagnostics().frame===null,'dot live stop cleanup');
+ sessionStorage.setItem('q-demo-expected',D.serialize(Q.store.getRecords()));sessionStorage.setItem('q-stage','dots-restore');location.reload();return;
 }catch(error){navigator.sendBeacon('ENDPOINT','ERROR '+error.stack+' / '+$('q-feedback').textContent);}
 });</script>'''
 
@@ -103,8 +121,11 @@ def run(server,protocol):
                     if target.exists() and not list(downloads.glob('*.crdownload')):break
                     time.sleep(.05)
                 value=json.loads(target.read_text(encoding='utf-8'))
-                assert value['schemaVersion']==2 and value['kind']=='three-questions-collection' and len(value['records'])==7
-                assert sum(p['source']=='synthetic' for p in value['records'])==6
+                assert value['schemaVersion']==2 and value['kind']=='three-questions-collection' and len(value['records'])==17
+                assert sum(p['source']=='synthetic' for p in value['records'])==16
+                demos=[p for p in value['records'] if p.get('demoBatchId')=='presentation-10-v1']
+                assert len(demos)==10 and sum(len(p['answers']) for p in demos)==30
+                assert all(p['isDemo'] and all(a['recordingVersion']=='dom-typing-v2' and len(a['typingActivities'])>0 for a in p['answers']) for p in demos)
                 actual=next(p for p in value['records'] if p['source']=='participant')
                 assert [a['text'] for a in actual['answers']]==['red','감사','hi']
                 for participant in value['records']:
@@ -112,7 +133,7 @@ def run(server,protocol):
                     for answer in participant['answers']:
                         assert ''.join(c['char'] for c in answer['characters'])==answer['text']
                         assert answer['firstActivityMs']>=0 and answer['submittedAtMs']>=answer['lastTextInputMs']
-                        assert answer['morse']['durationMs']>=answer['submittedAtMs'] and answer['recordingVersion']=='dom-composition-v1'
+                        assert answer['morse']['durationMs']>=answer['submittedAtMs'] and answer['recordingVersion'] in ('dom-composition-v1','dom-typing-v2')
                 print(f'[{protocol}] {reports[0]} / downloaded v2 JSON inspected',flush=True)
             finally:process.terminate();process.wait(timeout=10)
     finally:fixture.unlink()

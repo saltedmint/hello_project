@@ -6,7 +6,7 @@
   const TEXTS=[['파란색','친구가 기다려 준 날','고맙다는 말을 하고 싶어'],['black','a friend brought tea','i miss you'],['흰색 white','어제 함께 걸었을 때','다시 만나고 싶어'],['초록색','지하철에서 길을 알려준 순간','미안해'],['navy blue','this morning','thank you'],['회색','엄마와 통화했을 때','괜찮아']];
   function examples(){return TEXTS.map((answers,p)=>{
     const results=answers.map((text,q)=>{
-      const r=new HelloQuestionInput.Recorder(0);
+      const r=new HelloQuestionInput.Recorder(0,{recordingVersion:'dom-composition-v1'});
       // Exceptions are deliberate: P4 pauses on Q1; P5 answers Q3 promptly.
       const first=p===3&&q===0?6500:p===4&&q===2?350:[500,1800,5200][q]+p*130;
       let now=first;

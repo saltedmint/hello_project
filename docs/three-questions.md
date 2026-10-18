@@ -10,14 +10,15 @@
     source: "participant" | "synthetic", sound: { midi, pan },
     answers: [
       { questionId, questionVersion, question: {ko,en},
-        recordingVersion: "dom-composition-v1", text,
+        recordingVersion: "dom-composition-v1" | "dom-typing-v2", text,
         characters: [{ index, char, atMs }], events: [...],
+        typingActivities: [{atMs,eventIndex,keyEventIndex,unit}], // v2 입력만
         firstActivityMs, lastTextInputMs, submittedAtMs,
         focusLoss: [{fromMs,toMs,reason}],
         morse: { transformVersion: 1, unitMs: 80,
           originalDurationMs, durationMs, width,
           segments: [...], events: [...] }
-      }, ... // Q1, Q2, Q3 順
+      }, ... // Q1, Q2, Q3 순서
     ]
   }, ...
 ] }
@@ -30,6 +31,10 @@
 공백과 줄바꿈도 최종 문자에 포함한다. Unicode 코드포인트 기준 index를 사용하고 DOM selectionStart/End(UTF-16)는 코드포인트 인덱스로 변환한다. NFC 정규화를 강제로 적용해 입력 시각을 합치지 않는다. 호환 자모와 현대 초·중·종성 자모도 원래 위치를 유지한다.
 
 ## IME와 수정 기준
+
+새 입력의 `dom-typing-v2`는 원래 모스용 최종 문자/원시 로그를 보존하면서 별도 `typingActivities`를 저장한다. `eventIndex`는 실제 input/compositionend 로그, `keyEventIndex`는 확인된 keydown 또는 null이며, `unit`은 `physical-key` / `observed-input`이다. 원시 로그에서 같은 규칙으로 다시 계산해 가져온 활동 배열과 일치하는지 검증한다. DOM 값이 바뀐 input 하나에 여러 조합 알림이 따라와도 중복하지 않는다. 키로 같은 문자를 재입력한 행동은 DOM 값이 같아도 확인된 input이면 남긴다. 삭제·수정 키 로그는 유지하지만 점/소리에서는 제외한다. 삭제된 문자에 해당하는 이전 타격은 활동 배열에서 지우지 않는다.
+
+`dom-composition-v1` 파일은 그대로 읽고 다시 저장한다. 개별 타격 로그가 없으므로 최종 `characters`를 확보된 시각 순으로만 재생하고 행에 **문자 단위 기록 사용**을 표시한다. 자모 타이밍을 추정하거나 과거 중복 `activity` 알림을 실제 타격으로 세지 않는다. 자세한 PC/모바일 한계와 배치 등록·제거 방법은 README의 새 절에 있다.
 
 - 물리 keydown으로 한글 문자를 판정하지 않는다. 조합 도중 임시 DOM 값은 원시 활동일 뿐 확정 문자가 아니다.
 - compositionend 또는 그 후 실제 확정 DOM input에서 음절이 반영된 시각을 최종 문자에 쓴다. 같은 값의 후속 input은 문자를 추가하지 않는다.
@@ -72,9 +77,15 @@
 
 한 기기 최대 20명, 답변 120 코드포인트, 로그 10,000이벤트/답변, JSON 16MB이다. 관객 입력에는 시간 제한이나 자동 제출이 없다. 실시간 반복, 온라인 수집, AI 분석은 이번 범위에 없다. 공통 배율 변경은 원본을 바꾸지 않고 기존 예약을 정지한 뒤 새 재생에 적용한다.
 
+## 점 모드와 발표 배치
+
+점 모드는 `dots.js`가 원본 활동 시각에 80ms 음을 하나씩 만든다. 최초 침묵을 제거하지 않고, 문자/모스 부호 폭을 여백에 더하지 않는다. 재생 그룹은 질문별 제출 시간(마지막 짧은 음이 더 길면 그 음 끝)까지 유지한다. 사람별 오디오 설정·gain 보정과 엔진은 모스와 공유하되, 모스의 부호/침묵 계산은 바꾸지 않는다. 모드 전환은 완전 정지 후 같은 선택을 표시하며 다음 재생은 처음부터다. 공통 배율은 모든 질문·관객에 적용한다.
+
+`demo-seed.js`는 명시적 호출/등록 버튼으로만 실행한다. `isDemo:true`, `demoBatchId:"presentation-10-v1"`인 10명의 합성 데이터이며 ID가 고정돼 중복 삽입되지 않는다. 이전 6명 예시는 기존 v1 입력 버전으로 생성해 원본과 시각을 유지한다. 배치 제거와 기존 예시 제거는 분리되며 확인을 받는다. 실제 기록은 어느 제거에도 포함되지 않는다. 브라우저 localStorage를 쓰므로 개발용 격리 프로필에 등록했다는 것이 관객용 브라우저에 등록됐다는 뜻은 아니다.
+
 ## 실제 수행한 검증과 수동 확인
 
-- `python scripts/verify-browser.py`: 기존 A·이전 B 포함 208/208. 한글 11,172음절, 기본/복합 자모, 삭제/중간 삽입, IME 합성 이벤트 중복/제출, 실제 시간 보존, 합성 예시 재현, JSON·합류·중도취소·모드 정리.
+- `python scripts/verify-browser.py`: 기존 A·이전 B, 한글 11,172음절, 기본/복합 자모, 삭제/중간 삽입, IME 합성 이벤트 중복/제출, 실제 시간 보존, 합성 예시 재현, JSON·합류·중도취소·모드 정리 및 새 10명 배치/점 모드 회귀 검증.
 - 실제 OfflineAudioContext: 20명×세 질문 2,419부호 유한 파형, peak 0.1195, 클리핑 없음. 미래 부호를 예약한 뒤 정지한 렌더는 무음.
 - `python scripts/verify-questions.py`: HTTP/file://의 실제 Chrome UI 흐름, 실제 AudioContext 예약·완주·모드 취소, 네이티브 새로고침/다운로드/File 입력과 JSON 검사. 여기서의 IME는 합성 이벤트이다.
 - `python scripts/verify-downloads.py`: A의 실제 JSON 및 두 WAV 다운로드를 별도 검사한다.

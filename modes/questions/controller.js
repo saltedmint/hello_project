@@ -7,11 +7,12 @@
   const status=text=>{$('q-feedback').textContent=text;};
   const now=()=>performance.now();
   function stop(){generation++;player.stop();cancelAnimationFrame(frame);frame=null;$('q-stop').disabled=true;$('q-audio-status').textContent='정지';
-    $('q-board').querySelectorAll('.q-playhead').forEach(node=>node.hidden=true);$('q-board').querySelectorAll('.q-sounding').forEach(node=>node.classList.remove('q-sounding'));
+    $('q-board').querySelectorAll('.q-playhead').forEach(node=>node.hidden=true);$('q-board').querySelectorAll('.q-sounding,.q-group-playing').forEach(node=>node.classList.remove('q-sounding','q-group-playing'));
   }
   function records(){const values=store.getRecords();if(pending&&!values.some(r=>r.id===pending.id))values.push(pending);return values;}
   function own(){return pending||store.getRecords().find(r=>r.id===currentId);}
-  function selectedRecords(){const selected=$('q-person').value;return records().filter(r=>selected==='all'||r.id===selected);}
+  function filteredRecords(){const filter=$('q-data-filter').value;return records().filter(r=>filter==='all'||(filter==='demo')===(r.isDemo===true||r.source==='synthetic'));}
+  function selectedRecords(){const selected=$('q-person').value;return filteredRecords().filter(r=>selected==='all'||r.id===selected);}
   function paint(){
     const elapsed=player.position();if(elapsed===null)return;
     const group=player.plan.groups.find(g=>elapsed>=g.atMs&&elapsed<g.atMs+g.durationMs);
@@ -23,9 +24,11 @@
       const included=player.plan.participantIds.includes(row.dataset.participant);
       if(!group||group.questionId!==row.dataset.question||!answer||!included){cursor.hidden=true;continue;}
       const position=(elapsed-group.atMs)*player.plan.speed;
-      if(position>answer.morse.durationMs){cursor.hidden=true;continue;}
-      cursor.hidden=false;const x=HelloQuestionMorse.position(answer.morse,position,$('q-axis').value==='original');cursor.style.left=`${x}px`;
-      const segment=answer.morse.segments.find(s=>position>=s.atMs&&position<s.atMs+s.durationMs);
+      const dots=player.plan.expression==='dots',score=dots?HelloQuestionDots.compile(answer):answer.morse;
+      if(position>score.durationMs){cursor.hidden=true;continue;}
+      cursor.hidden=false;const x=dots?position*C.pixelsPerMs*Number($('q-zoom').value):HelloQuestionMorse.position(answer.morse,position,$('q-axis').value==='original');cursor.style.left=`${x}px`;
+      if(dots){for(const event of score.events)if(position>=event.atMs&&position<event.atMs+event.durationMs)row.querySelector(`[data-activity="${event.activityIndex}"]`)?.classList.add('q-sounding');}
+      const segment=dots?null:answer.morse.segments.find(s=>position>=s.atMs&&position<s.atMs+s.durationMs);
       if(segment?.kind==='tone')row.querySelectorAll(`[data-char="${segment.charIndex}"]`).forEach(node=>{
         if($('q-axis').value==='original'||Number(node.dataset.at)===segment.atMs)node.classList.add('q-sounding');
       });
@@ -33,29 +36,37 @@
     }
     if(active&&player.running)frame=requestAnimationFrame(paint);
   }
-  async function play(values,questionId='all'){
+  async function play(values,questionId=$('q-question-selection').value){
+    $('q-question-selection').value=questionId;
+    $('q-play-all').textContent=questionId==='all'?'Q1 → Q2 → Q3 듣기':`${questionId} 다시 듣기`;
     stop();const token=generation;$('q-stop').disabled=false;
     try{
-      const plan=HelloQuestionAudio.buildPlan(values,{questionId,speed:Number($('q-speed').value)});plan.participantIds=values.map(r=>r.id);
+      const plan=HelloQuestionAudio.buildPlan(values,{questionId,speed:Number($('q-speed').value),expression:$('q-expression').value});plan.participantIds=values.map(r=>r.id);
       await player.start(plan,()=>{cancelAnimationFrame(frame);frame=null;$('q-stop').disabled=true;$('q-audio-status').textContent='재생 완료';$('q-board').querySelectorAll('.q-playhead').forEach(node=>node.hidden=true);$('q-board').querySelectorAll('.q-sounding,.q-group-playing').forEach(node=>node.classList.remove('q-sounding','q-group-playing'));});
       if(token!==generation||!active)return;paint();
     }catch(error){if(token===generation){stop();status(`재생 실패: ${error.message}`);}}
   }
   let recordsCache=[];
   function renderResults(){
-    const all=records(),old=$('q-person').value;
+    const all=filteredRecords(),old=$('q-person').value;
     $('q-person').replaceChildren(new Option('여러 관객 · 같은 질문 비교','all'));
     all.forEach((record,i)=>$('q-person').append(new Option(`${record.id===currentId?'나의 응답':`관객 ${String(i+1).padStart(2,'0')}`} ${record.source==='synthetic'?'· 합성 예시':''}`,record.id)));
     $('q-person').value=all.some(r=>r.id===old)?old:'all';recordsCache=selectedRecords();
+    const dots=$('q-expression').value==='dots';
+    $('q-expression-note').textContent=dots?'질문 시작 기준 입력 활동을 같은 크기의 점과 짧은 소리로 재생합니다. 긴 침묵은 빈 공간이며 가까운 점은 그대로 겹칩니다. 점 확대와 행 내부 가로 이동으로 확인하세요.':'같은 질문의 시작을 맞춥니다. 기존 모스 부호 길이에 실제 침묵을 더한 변환이며 원본 타이핑의 실시간 복제는 아닙니다. 원본 시간축의 빗금은 포커스 이탈이며 미지원 문자는 ◇로 남깁니다. 긴 행은 가로로 이동할 수 있습니다.';
+    $('q-demo-notice').hidden=!recordsCache.some(r=>r.isDemo||r.source==='synthetic');
+    $('q-board').setAttribute('aria-label',`Q1 Q2 Q3 응답의 시간과 ${dots?'타이핑 점':'모스'}`);
+    $('q-play-all').textContent=$('q-question-selection').value==='all'?'Q1 → Q2 → Q3 듣기':`${$('q-question-selection').value} 다시 듣기`;
     $('q-board').replaceChildren();
     C.questions.forEach(question=>{
       const column=V.element('section','q-question-column');column.dataset.question=question.id;
       const heading=V.element('header','q-column-heading');heading.append(V.element('strong','',question.id),V.element('h2','',question.ko));
       const button=V.element('button','',`${question.id} 듣기`);button.disabled=!recordsCache.length;button.addEventListener('click',()=>play(selectedRecords(),question.id));heading.append(button);column.append(heading);
       const rows=V.element('div','q-question-rows');rows.style.setProperty('--rows',String(Math.max(1,recordsCache.length)));
-      recordsCache.forEach((record,i)=>rows.append(V.row(record,record.answers.find(a=>a.questionId===question.id),{original:$('q-axis').value==='original',current:record.id===currentId,reveal:$('q-show-original').checked,index:i})));
+      recordsCache.forEach((record,i)=>rows.append(V.row(record,record.answers.find(a=>a.questionId===question.id),{expression:$('q-expression').value,zoom:Number($('q-zoom').value),original:$('q-axis').value==='original',current:record.id===currentId,reveal:$('q-show-original').checked,index:i})));
       if(!recordsCache.length)rows.append(V.element('p','q-empty','아직 합류한 응답이 없습니다.'));column.append(rows);$('q-board').append(column);
     });
+    const demo=HelloQuestionDemo.query(store);$('q-demo-count').textContent=`발표용 합성 데이터 ${demo.participants}명 · ${demo.answers}답변`;
     $('q-count').textContent=`${store.records.length}명 합류${pending?' · 내 응답 확인 중':''} / 최대 ${C.maxParticipants}명`;
     $('q-own-listen').disabled=!own();$('q-play-all').disabled=!all.length;$('q-join').hidden=!pending;$('q-join-listen').hidden=!pending;
     $('q-own-details').replaceChildren();if(own())$('q-own-details').append(V.review(own()));
@@ -104,8 +115,8 @@
     listen(input,'compositionupdate',event=>{if(recorder)recorder.compositionUpdate(event.data,now());});
     listen(input,'compositionend',event=>{if(recorder)rollback(recorder.compositionEnd(input.value,event.data,now()));});
     for(const type of ['paste','drop'])listen(input,type,event=>{event.preventDefault();if(recorder)recorder.blocked(now(),type);status('리듬 기록에는 직접 타이핑이 필요합니다.');});
-    listen(input,'keydown',event=>{if(event.key==='Enter'&&(event.isComposing||recorder?.composing))imeEnter=true;});
-    listen(input,'keyup',event=>{if(event.key==='Enter')imeEnter=false;});
+    listen(input,'keydown',event=>{if(recorder&&state==='question'){recorder.keyDown(event,now());if(event.repeat){event.preventDefault();return;}}if(event.key==='Enter'&&(event.isComposing||recorder?.composing))imeEnter=true;});
+    listen(input,'keyup',event=>{if(recorder&&state==='question')recorder.keyUp(now());if(event.key==='Enter')imeEnter=false;});
     listen(input,'blur',()=>{if(recorder&&state==='question')recorder.loseFocus(now(),'input');});
     listen(input,'focus',()=>{if(recorder&&state==='question')recorder.gainFocus(now());});
     listen(window,'blur',()=>{if(recorder&&state==='question')recorder.loseFocus(now(),'window');stop();});
@@ -118,11 +129,17 @@
   $('q-cancel').addEventListener('click',reset);$('q-next-visitor').addEventListener('click',reset);$('q-open-landscape').addEventListener('click',()=>{screen('results');renderResults();});
   $('q-join').addEventListener('click',()=>join());$('q-join-listen').addEventListener('click',()=>join(true));
   $('q-own-listen').addEventListener('click',()=>{if(own())play([own()]);});$('q-play-all').addEventListener('click',()=>play(selectedRecords()));$('q-stop').addEventListener('click',stop);
+  $('q-expression').addEventListener('change',()=>{stop();const dots=$('q-expression').value==='dots';$('q-axis').disabled=dots;$('q-zoom').disabled=!dots;renderResults();status('표현을 바꿨습니다. 선택한 기록은 유지되며 다시 듣기를 누르면 처음부터 재생합니다.');});
+  $('q-data-filter').addEventListener('change',()=>{stop();renderResults();});
+  $('q-question-selection').addEventListener('change',()=>{stop();renderResults();});
+  $('q-zoom').addEventListener('change',renderResults);
   $('q-person').addEventListener('change',()=>{stop();renderResults();});$('q-axis').addEventListener('change',renderResults);$('q-show-original').addEventListener('change',renderResults);
   $('q-speed').addEventListener('change',()=>{stop();$('q-rate').textContent=`모든 질문 ${$('q-speed').value}×`;status('같은 배율을 모든 질문에 적용합니다. 원본 시각은 바뀌지 않습니다. 다시 듣기를 눌러 주세요.');});
   $('q-volume').addEventListener('input',event=>player.setVolume(event.target.value));
   $('q-load-examples').addEventListener('click',()=>{try{stop();const count=store.add(HelloQuestionExamples.examples());screen('results');$('q-person').value='all';renderResults();status(store.warning||`발표용 합성 예시 ${count}명 × 세 답변을 추가했습니다. 실제 관객의 일반적 패턴을 뜻하지 않습니다.`);}catch(error){status(error.message);}});
-  $('q-remove-examples').addEventListener('click',()=>{stop();store.removeExamples();renderResults();status(store.warning||'발표용 합성 예시만 제거했습니다.');});
+  $('q-remove-examples').addEventListener('click',()=>{if(!window.confirm('이전 합성 예시 6명만 제거할까요? 발표 배치와 실제 기록은 유지합니다.'))return;stop();store.removeExamples();renderResults();status(store.warning||'이전 합성 예시만 제거했습니다.');});
+  $('q-seed-demo').addEventListener('click',()=>{try{stop();const result=HelloQuestionDemo.seed(store);screen('results');renderResults();status(result.persisted?`발표용 합성 데이터: ${result.participants}명 · ${result.answers}답변 등록 확인 (${result.added}명 추가). 실제 관객 기록이 아닙니다.`:store.warning||'브라우저 저장을 확인하지 못했습니다. JSON으로 백업해 주세요.');}catch(error){status(`배치 등록 실패: ${error.message} 기존 기록은 유지했습니다.`);}});
+  $('q-remove-demo').addEventListener('click',()=>{if(!window.confirm(`발표용 합성 데이터 배치 ${HelloQuestionDemo.batchId}만 제거할까요? 실제 기록과 이전 예시는 유지합니다.`))return;stop();store.removeDemoBatch(HelloQuestionDemo.batchId);renderResults();status(store.warning||'지정한 발표용 합성 배치만 제거했습니다.');});
   $('q-download').addEventListener('click',()=>{try{const url=URL.createObjectURL(new Blob([D.serialize(store.getRecords())],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download='three-questions-v2.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}catch(error){status(error.message);}});
   $('q-upload').addEventListener('click',()=>$('q-file').click());
   $('q-file').addEventListener('change',async event=>{const token=generation,file=event.target.files?.[0];try{if(!file)return;if(file.size>C.maxFileBytes)throw Error('파일은 16MB 이하여야 합니다.');const records=D.parse(await file.text());if(!active||token!==generation)return;stop();const count=store.add(records);screen('results');renderResults();status(store.warning||`${count}명의 완료 기록을 불러왔습니다. 소리는 자동 재생하지 않습니다.`);}catch(error){status(`불러오기 실패: ${error.message} 기존 기록은 유지했습니다.`);}finally{event.target.value='';}});
