@@ -42,7 +42,7 @@
 @media(max-width:700px) { .b-input-panel{padding:16px;}#b-input-letters{font-size:34px;}.b-record{padding:15px;}.b-record-heading{flex-wrap:wrap;} }
 .b-tools { margin-top:22px; font-size:12px; }
 .b-random-panel { border-top:1px solid var(--line); padding-top:14px; margin-top:20px; }
-.b-random-panel #b-random-title { font-size:14px; margin:0 0 8px; }
+.b-random-panel h2 { font-size:14px; margin:0 0 8px; }
 .b-random-panel p { font-size:11px; line-height:1.7; margin:0 0 12px; }
 .b-random-panel button { padding:8px 10px; font-size:11px; }
 .b-tools summary { cursor:pointer; color:var(--green); padding:10px 0; }

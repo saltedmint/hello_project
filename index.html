@@ -95,13 +95,18 @@
         <div id="b-preview" hidden aria-label="나의 입력 미리보기"></div>
       </section>
       <p id="b-feedback" role="status">한 기기에서 차례로 참여합니다. 최대 20개의 기록을 이 브라우저에 저장합니다.</p>
+      <section class="b-random-panel" aria-labelledby="b-example-title">
+        <h2 id="b-example-title">같은 문장으로 실험하기</h2>
+        <p>같은 hello stranger를 서로 다른 간격으로 입력한 합성 트랙을 추가합니다.</p>
+        <div class="b-actions"><label>예시 트랙 수 <select id="b-example-count"><option>1</option><option>5</option><option selected>10</option><option>20</option></select></label><button id="b-examples">hello stranger 예시 추가</button></div>
+      </section>
       <section class="b-random-panel" aria-labelledby="b-random-title">
         <h2 id="b-random-title">다른 문장으로 실험하기</h2>
         <p>영문 문장과 타이핑 간격을 임의로 만듭니다. 실제 참여자가 아닌 합성 테스트입니다.</p>
         <div class="b-actions"><label>추가할 트랙 <select id="b-random-count"><option>1</option><option selected>5</option><option>10</option><option>20</option></select></label><button id="b-random-tests">임의 문장 · 리듬 추가</button><button id="b-clear-random" class="quiet">임의 테스트만 삭제</button></div>
       </section>
-      <details class="b-tools"><summary>예시 · JSON · 기록 관리</summary>
-      <div class="b-storage b-actions"><label>시험할 예시 수 <select id="b-example-count"><option>1</option><option>5</option><option selected>10</option><option>20</option></select></label><button id="b-examples">예시 기록 불러오기</button><button id="b-download" disabled>전체 기록 JSON 다운로드</button><button id="b-upload">전체 기록 JSON 불러오기</button><input id="b-json-file" type="file" accept=".json,application/json" hidden><button id="b-clear" class="quiet">전체 기록 삭제</button></div>
+      <details class="b-tools"><summary>JSON · 기록 관리</summary>
+      <div class="b-storage b-actions"><button id="b-download" disabled>전체 기록 JSON 다운로드</button><button id="b-upload">전체 기록 JSON 불러오기</button><input id="b-json-file" type="file" accept=".json,application/json" hidden><button id="b-clear" class="quiet">전체 기록 삭제</button></div>
       <p class="handwriting-hint">예시는 실제 참여 기록이 아닙니다. JSON 불러오기는 기존 기록에 추가하며 같은 ID는 중복하지 않습니다.<br>새로고침 후 기록은 복원되며 소리는 자동 재생하지 않습니다. 모스는 정확한 문자 부호에 타이핑 간격을 더한 시각화입니다.</p>
       </details>
       </aside>
