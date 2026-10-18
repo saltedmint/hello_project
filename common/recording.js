@@ -37,6 +37,10 @@
       if (!object(value.a)) fail('a 확장은 객체여야 합니다.');
       result.a = JSON.parse(JSON.stringify(value.a));
     }
+    if (value.b !== undefined) {
+      if (!object(value.b)) fail('b 확장은 객체여야 합니다.');
+      result.b = JSON.parse(JSON.stringify(value.b));
+    }
     return result;
   }
   function parse(text) {

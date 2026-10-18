@@ -66,5 +66,26 @@
     get durationMs() { return this.complete ? this.bars.reduce((total, bar) => total + bar.durationMs, 0) : null; }
   }
 
-  globalThis.HelloTyping = { BarRecorder, Recorder };
+  // Arbitrary fixed phrases, including spaces. A's Enter-based recorder stays
+  // compatible while B uses this smaller, text-length-independent recorder.
+  class PhraseRecorder {
+    constructor(text) { this.text = text; this.reset(); }
+    reset() { this.times = []; this.held = new Set(); this.active = false; }
+    start() { this.reset(); this.active = true; }
+    release(code) { this.held.delete(code); }
+    keydown(event, now) {
+      if (!this.active) return 'inactive';
+      if (event.repeat || this.held.has(event.code)) return 'repeat';
+      this.held.add(event.code);
+      if (event.isComposing || event.keyCode === 229) return 'composition';
+      if (event.ctrlKey || event.metaKey || event.altKey || event.key !== Array.from(this.text)[this.times.length]) return 'wrong';
+      this.times.push(now);
+      if (this.times.length === Array.from(this.text).length) { this.active = false; return 'complete'; }
+      return 'accepted';
+    }
+    get relative() { return this.times.map(t => t - this.times[0]); }
+    get complete() { return this.times.length === Array.from(this.text).length; }
+    get durationMs() { return this.complete ? this.relative.at(-1) : null; }
+  }
+  globalThis.HelloTyping = { BarRecorder, Recorder, PhraseRecorder };
 })();
