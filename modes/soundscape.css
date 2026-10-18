@@ -1,0 +1,42 @@
+.soundscape-entry > p { line-height:1.9; }
+.b-input-panel { background:#fffef9; border:1px solid var(--line); border-radius:14px; padding:28px; margin-top:34px; }
+#b-input-zone { overflow-x:auto; padding:26px 8px; border-radius:6px; }
+#b-input-zone:focus { outline:1px solid #779383; outline-offset:4px; }
+#b-input-letters { white-space:nowrap; font-family:'Bodoni Moda',Georgia,serif; font-size:50px; color:#9a9e96; letter-spacing:3px; width:max-content; }
+#b-input-letters .b-entered { color:var(--green); }
+#b-draft-status, #b-feedback { font-size:12px; line-height:1.8; }
+#b-feedback { min-height:24px; color:var(--green); margin:20px 0 30px; }
+.b-actions { display:flex; align-items:center; flex-wrap:wrap; gap:9px; }
+.b-actions label { display:flex; align-items:center; gap:10px; font-size:12px; color:var(--muted); }
+.b-actions input[type=range] { width:90px; accent-color:var(--green); }
+.b-actions select { padding:7px; font:inherit; border:1px solid var(--line); border-radius:5px; background:#fffef9; }
+.b-toolbar { display:flex; justify-content:space-between; gap:18px; flex-wrap:wrap; padding:24px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+.b-actions button[aria-pressed=true] { background:var(--green);color:#fff; }
+#b-playing { color:var(--muted);font-size:12px; }
+.b-collection-heading { display:flex;align-items:center;justify-content:space-between;gap:15px;margin:26px 0 12px; }
+.b-collection-heading h2 { font-size:18px;font-weight:500; }
+.b-collection-heading > span { font-size:11px;color:var(--muted); }
+#b-records { list-style:none;padding:0;margin:0;border-radius:12px;overflow:hidden;background:#fffef9;border:1px solid var(--line); }
+#b-records:empty { min-height:80px; }
+.b-record { padding:20px 24px;border-bottom:1px solid var(--line); }
+.b-record:last-child { border:0; }
+.b-record-heading { display:flex;align-items:center;gap:10px;color:var(--muted);font-size:11px;margin-bottom:12px; }
+.b-record-heading > span { flex:1; }
+.b-record-heading button { font-size:11px;padding:6px 9px;background:transparent; }
+.b-phrase { display:flex;align-items:center;overflow-x:auto;white-space:nowrap;padding:15px 0 24px; }
+.b-phrase > span { flex-shrink:0; }
+.b-spacing { font:500 42px/1.4 'Bodoni Moda',Georgia,serif;font-optical-sizing:none;font-variation-settings:'opsz' 96; }
+.b-letter { opacity:var(--age-opacity,1);color:var(--green); }
+.b-space { display:inline-block;width:.28em; }
+.b-sounding { opacity:1!important;color:#c67f26!important; }
+.b-storage { margin-top:26px; }
+#b-preview { margin-top:20px;padding:0 12px;overflow-x:auto; }
+#b-preview:has(.b-morse), #b-records.morse-view { background:#101413;color:#fff; }
+.morse-view .b-record { border-color:#343b37; }
+.morse-view .b-record-heading { color:#becac1; }
+.morse-view button { color:#e5eee7;border-color:#58645c; }
+.b-morse-group { display:inline-flex;align-items:center;gap:var(--morse-unit);opacity:var(--age-opacity,1);height:28px; }
+.b-morse-group i { display:block;height:5px;background:#fff;border-radius:3px; }
+.b-morse-group .dot { width:var(--morse-unit); }.b-morse-group .dash { width:calc(var(--morse-unit) * 3); }
+.b-morse-group.b-sounding i { background:#e9bd75; }
+@media(max-width:700px) { .b-input-panel{padding:16px;}#b-input-letters{font-size:34px;}.b-record{padding:15px;}.b-record-heading{flex-wrap:wrap;} }

@@ -40,17 +40,17 @@ globalThis.runModeTests = async ({ check, assert, same, fourRecord, frame, uiAud
     assert(state.letterFrame === null && state.handwritingFrame === null && state.inputBindings === 0 && !state.canvasInputEnabled);
     assert($('mode-a').hidden && !$('mode-b').hidden && $('letters').querySelectorAll('.sounding').length === 0);
   });
-  check('B: 준비 중을 명시 · 공통 기록 연결 · 오디오/입력 엔진 없음', () => {
-    assert(host.getMode() === 'b' && !w.HelloSoundscape.diagnostics().audioImplemented);
-    assert($('mode-b').textContent.includes('아직 구현하지 않았습니다'));
-    assert(w.HelloSoundscape.getRecords().some(record => record.id === base.id));
-    assert($('b-records').textContent.includes('실제 참여자 아님'));
+  check('B: 별도 14자 입력 · A 기록은 보존하며 B 소리 레이어에 혼합하지 않음', () => {
+    assert(host.getMode() === 'b' && w.HelloSoundscape.diagnostics().audioImplemented);
+    assert($('b-input-zone').textContent.includes('hello'));
+    assert(host.getRecords().some(record => record.id === base.id));
+    assert(!w.HelloSoundscape.getRecords().some(record => record.id === base.id));
   });
   const basic = { schemaVersion:1,id:'b-common-only',text:'hello',relativeTimesMs:[0,180,420,570,900],durationMs:900,source:'imported' };
   host.importText(JSON.stringify(basic));
   check('B: 최소 공통 JSON도 연결 · 저장 기록 개수는 ID 기준', () => {
     const count = host.getRecords().length; host.importText(JSON.stringify(basic));
-    assert(host.getRecords().length === count && w.HelloSoundscape.getRecords().some(record => record.id === basic.id));
+    assert(host.getRecords().length === count && !w.HelloSoundscape.getRecords().some(record => record.id === basic.id));
   });
   // A-compatible example selected in B must survive A.enter() publishing older data.
   host.importText(JSON.stringify(base)); $('nav-a').click();
@@ -99,9 +99,9 @@ globalThis.runModeTests = async ({ check, assert, same, fourRecord, frame, uiAud
     assert($('letters').querySelectorAll('.recorded').length === 0);
   });
   $('nav-home').click();
-  check('시작 화면: A/B 두 모드 선택 · B 준비 상태 · 모드별 화면 숨김', () => {
+  check('시작 화면: A/B 두 모드 선택 · 모드별 화면 숨김', () => {
     assert(!$('mode-home').hidden && $('mode-a').hidden && $('mode-b').hidden && $('mode-nav').hidden);
-    assert($('mode-home').textContent.includes('준비 중'));
+    assert($('mode-home').textContent.includes('hello stranger'));
   });
   const fresh = document.createElement('iframe');
   const markup = await (await fetch('index.html')).text();

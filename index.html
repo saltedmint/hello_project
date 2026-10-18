@@ -5,11 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>hello — 당신의 타이핑 리듬</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="modes/soundscape.css">
   <script src="assets/drums/embedded.js" defer></script>
   <script src="common/typing.js" defer></script><script src="common/audio.js" defer></script><script src="common/recording.js" defer></script><script src="modes/orchestra-audio.js" defer></script>
   <script src="modes/orchestra-handwriting.js" defer></script>
   <script src="modes/orchestra-wav.js" defer></script><script src="modes/orchestra-data.js" defer></script>
   <script src="modes/orchestra.js" defer></script>
+  <script src="modes/soundscape-data.js" defer></script>
+  <script src="modes/soundscape-visual.js" defer></script>
+  <script src="modes/soundscape-audio.js" defer></script>
   <script src="modes/soundscape.js" defer></script>
   <script src="app.js" defer></script>
 </head>
@@ -23,7 +27,7 @@
       <p>타이핑의 간격을 음악으로 바라봅니다. 실험할 방향을 선택하세요.</p>
       <div class="mode-cards">
         <article><span class="mode-letter">A</span><h2>인사 오케스트라</h2><p>나의 네 마디 hello를 타악기로.<br>손글씨 선율과 함께 듣고 WAV로 저장합니다.</p><button id="choose-a" class="primary">A 시작하기 ↗</button></article>
-        <article><span class="mode-letter">B</span><h2>인사 사운드스케이프</h2><p>여러 사람의 hello가 겹치는 전자음 풍경.<br>현재는 준비 화면과 기록 데이터 연결만 제공합니다.</p><span class="pending-badge">준비 중 · 소리 없음</span><button id="choose-b">B 준비 화면 보기 ↗</button></article>
+        <article><span class="mode-letter">B</span><h2>인사 사운드스케이프</h2><p>hello stranger, 저마다 다른 간격.<br>여러 사람의 인사를 고요한 전자음 풍경으로 쌓습니다.</p><span class="pending-badge">이 기기에서 함께 만드는 풍경</span><button id="choose-b">B 시작하기 ↗</button></article>
       </div>
     </section>
     <section class="record-tools" aria-label="공통 타이핑 기록 JSON">
@@ -81,12 +85,23 @@
     </section>
     </div>
     <section id="mode-b" hidden class="soundscape-entry" aria-labelledby="b-title">
-      <span class="pending-badge">B · 준비 중</span><h1 id="b-title">인사 사운드스케이프</h1>
-      <p>여러 사람의 hello 타이핑 기록을 전자음으로 겹쳐 듣는 실험을 준비합니다.</p>
-      <p>현재는 공통 JSON 데이터 연결 지점만 있습니다. 소리 재생·레이어 관리·누적 사운드 엔진·서버·공개 수집은 아직 구현하지 않았습니다.</p>
-      <h2 id="b-record-count">0개 기록 연결 · 오디오 엔진 준비 중</h2>
-      <ul id="b-records" aria-label="현재 브라우저에 연결한 기록"></ul>
-      <p class="handwriting-hint">위의 JSON 불러오기로 데이터를 확인할 수 있습니다. 예시는 실제 참여자 기록과 구분해 표시합니다. 새로고침하면 메모리 목록은 사라집니다.</p>
+      <span class="eyebrow">B / A COLLECTIVE GREETING</span><h1 id="b-title">인사 사운드스케이프</h1>
+      <p>같은 인사, 서로 다른 간격. 한 사람씩 입력하고 풍경에 보태 주세요.<br>입력은 조용하게 기록합니다. 공백도 당신의 리듬입니다.</p>
+      <section class="b-input-panel" aria-label="인사 입력">
+        <div id="b-input-zone" tabindex="-1" role="group" aria-label="hello stranger 키보드 입력" aria-describedby="b-draft-status b-feedback"><div id="b-input-letters" aria-label="hello stranger">hello stranger</div></div>
+        <p id="b-draft-status" role="status">영문 소문자 입력 모드로 준비해 주세요.</p>
+        <div class="b-actions"><button id="b-input-start" class="primary">인사 입력하기</button><button id="b-reset">다시 입력하기</button><button id="b-submit" disabled>풍경에 보태기</button></div>
+        <div id="b-preview" hidden aria-label="나의 입력 미리보기"></div>
+      </section>
+      <p id="b-feedback" role="status">한 기기에서 차례로 참여합니다. 최대 20개의 기록을 이 브라우저에 저장합니다.</p>
+      <div class="b-toolbar">
+        <div class="b-actions" aria-label="시각화 선택"><button id="b-spacing" aria-pressed="true">자간</button><button id="b-morse" aria-pressed="false">모스</button></div>
+        <div class="b-actions"><button id="b-sound-start" class="primary" disabled>전체 듣기 · 사운드 시작</button><button id="b-stop" disabled>정지</button><label>마스터 음량 <input id="b-volume" type="range" min="0" max="1" step=".01" value=".5"></label><span id="b-playing" role="status">정지</span></div>
+      </div>
+      <div class="b-collection-heading"><h2 id="b-record-count">0 / 20개 기록</h2><span>오래된 인사도 풍경 안에 남습니다.</span></div>
+      <ul id="b-records" aria-label="누적된 사람별 인사 기록"></ul>
+      <div class="b-storage b-actions"><label>시험할 예시 수 <select id="b-example-count"><option>1</option><option>5</option><option selected>10</option><option>20</option></select></label><button id="b-examples">예시 기록 불러오기</button><button id="b-download" disabled>전체 기록 JSON 다운로드</button><button id="b-upload">전체 기록 JSON 불러오기</button><input id="b-json-file" type="file" accept=".json,application/json" hidden><button id="b-clear" class="quiet">전체 기록 삭제</button></div>
+      <p class="handwriting-hint">예시는 실제 참여 기록이 아닙니다. JSON 불러오기는 기존 기록에 추가하며 같은 ID는 중복하지 않습니다.<br>새로고침 후 기록은 복원되며 소리는 자동 재생하지 않습니다. 모스는 정확한 문자 부호에 타이핑 간격을 더한 시각화입니다.</p>
     </section>
     <footer><span>입력은 조용하게. 재생은 있는 그대로.</span><span>HELLO / RHYTHM</span></footer>
   </main>
