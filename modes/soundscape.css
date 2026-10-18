@@ -55,7 +55,7 @@
   body.soundscape-open main > header, body.soundscape-open main > footer { display:none; }
   body.soundscape-open #mode-nav { margin:0; flex-shrink:0; }
   body.soundscape-open #mode-nav button { padding:8px 13px; }
-  body.soundscape-open #mode-b { display:grid; grid-template-columns:240px minmax(0,1fr); gap:26px; flex:1; min-height:0; padding:0; }
+  body.soundscape-open #mode-b-legacy { display:grid; grid-template-columns:240px minmax(0,1fr); gap:26px; flex:1; min-height:0; padding:0; }
   .b-sidebar { overflow-y:auto; min-height:0; padding:10px 6px 16px 0; }
   .b-sidebar .eyebrow { font-size:9px; }
   .b-sidebar #b-title { font-size:22px; line-height:1.4; margin:12px 0; }

@@ -33,15 +33,15 @@ globalThis.runModeTests = async ({ check, assert, same, fourRecord, frame, uiAud
   check('모드 전환 전 A 타악기·선율·글자/경로 RAF가 실제로 예약됨', () => {
     assert(a.diagnostics().voices > 20 && a.diagnostics().loopTimer !== null && a.diagnostics().handwritingFrame !== null);
   });
-  $('nav-b').click();
+  $('nav-b-legacy').click();
   check('A→B: 음원·예약·타이머·두 RAF·키보드/Canvas 리스너 모두 해제', () => {
     const state = a.diagnostics();
     assert(!state.active && state.voices === 0 && state.events === 0 && state.loopTimer === null);
     assert(state.letterFrame === null && state.handwritingFrame === null && state.inputBindings === 0 && !state.canvasInputEnabled);
-    assert($('mode-a').hidden && !$('mode-b').hidden && $('letters').querySelectorAll('.sounding').length === 0);
+    assert($('mode-a').hidden && !$('mode-b-legacy').hidden && $('letters').querySelectorAll('.sounding').length === 0);
   });
   check('B: 별도 14자 입력 · A 기록은 보존하며 B 소리 레이어에 혼합하지 않음', () => {
-    assert(host.getMode() === 'b' && w.HelloSoundscape.diagnostics().audioImplemented);
+    assert(host.getMode() === 'b-legacy' && w.HelloSoundscape.diagnostics().audioImplemented);
     assert($('b-input-zone').textContent.includes('hello'));
     assert(host.getRecords().some(record => record.id === base.id));
     assert(!w.HelloSoundscape.getRecords().some(record => record.id === base.id));
@@ -73,7 +73,7 @@ globalThis.runModeTests = async ({ check, assert, same, fourRecord, frame, uiAud
   });
   let resolveFile;
   const pendingFile = host.importFile({ size:10,text:()=>new Promise(resolve=>{resolveFile=resolve;}) });
-  $('nav-b').click(); resolveFile(JSON.stringify({...basic,id:'late-file'})); await pendingFile;
+  $('nav-b-legacy').click(); resolveFile(JSON.stringify({...basic,id:'late-file'})); await pendingFile;
   check('모드 전환 중 늦게 끝난 파일 읽기는 이전 모드에 적용하지 않음', () => assert(!host.getRecords().some(record => record.id === 'late-file')));
   $('nav-a').click();
   const realRender = w.HelloWav.renderExport, realDownloadWav = w.HelloWav.download; let resolveExport, downloads = 0;
@@ -81,18 +81,18 @@ globalThis.runModeTests = async ({ check, assert, same, fourRecord, frame, uiAud
   w.HelloWav.download = () => { downloads++; };
   try {
     $('download-original').click(); assert(a.diagnostics().exporting);
-    $('nav-b').click(); resolveExport({wav:new ArrayBuffer(44),gain:1,plan:{durationSeconds:1,count:1}});
+    $('nav-b-legacy').click(); resolveExport({wav:new ArrayBuffer(44),gain:1,plan:{durationSeconds:1,count:1}});
     await wait(() => !a.diagnostics().exporting);
     check('WAV 렌더 중 모드 전환: 오래된 완료 콜백의 다운로드·화면 반응 취소', () => {
-      assert(downloads === 0 && host.getMode() === 'b' && !a.diagnostics().active);
+      assert(downloads === 0 && host.getMode() === 'b-legacy' && !a.diagnostics().active);
     });
   } finally { w.HelloWav.renderExport = realRender; w.HelloWav.download = realDownloadWav; }
-  for(let i=0;i<5;i++){host.selectMode('a');host.selectMode('b');}
+  for(let i=0;i<5;i++){host.selectMode('a');host.selectMode('b-legacy');}
   host.selectMode('a'); $('reset').click(); [...'hello'].forEach(type); type('Enter');
   check('반복 모드 전환: 입력 리스너 중복 없음 · 하나의 Enter는 한 마디만 완료', () => {
     assert($('bar-progress').textContent.includes('완료 1개') && a.diagnostics().inputBindings > 0);
   });
-  $('nav-b').click();
+  $('nav-b-legacy').click();
   const zone = $('input-zone');zone.dispatchEvent(new w.KeyboardEvent('keydown',{key:'h',code:'KeyH',bubbles:true}));
   check('입력 중 A→B: 부분 시도 취소 · 숨겨진 영역의 키 입력 미적용', () => {
     assert(a.diagnostics().state === 'waiting' && a.diagnostics().inputBindings === 0);
@@ -100,7 +100,7 @@ globalThis.runModeTests = async ({ check, assert, same, fourRecord, frame, uiAud
   });
   $('nav-home').click();
   check('시작 화면: A/B 두 모드 선택 · 모드별 화면 숨김', () => {
-    assert(!$('mode-home').hidden && $('mode-a').hidden && $('mode-b').hidden && $('mode-nav').hidden);
+    assert(!$('mode-home').hidden && $('mode-a').hidden && $('mode-b-legacy').hidden && $('mode-nav').hidden);
     assert($('mode-home').textContent.includes('hello stranger'));
   });
   const fresh = document.createElement('iframe');
@@ -108,10 +108,10 @@ globalThis.runModeTests = async ({ check, assert, same, fourRecord, frame, uiAud
   const noAudio = `<base href="${location.href}"><script>window.AudioContext=function(){throw Error('B must not create audio');};window.OfflineAudioContext=function(){throw Error('B must not decode audio');};<\/script>`;
   fresh.srcdoc = markup.replace('<head>', '<head>' + noAudio); document.body.append(fresh);
   await new Promise(resolve => fresh.addEventListener('load', resolve, {once:true}));
-  fresh.contentDocument.getElementById('choose-b').click();
+  fresh.contentDocument.getElementById('choose-b-legacy').click();
   check('새 B 진입: AudioContext와 디코더를 쓸 수 없어도 준비 화면 정상', () => {
-    assert(fresh.contentWindow.HelloExperiments.getMode() === 'b');
-    assert(!fresh.contentDocument.getElementById('mode-b').hidden && !fresh.contentWindow.HelloOrchestra.diagnostics().active);
+    assert(fresh.contentWindow.HelloExperiments.getMode() === 'b-legacy');
+    assert(!fresh.contentDocument.getElementById('mode-b-legacy').hidden && !fresh.contentWindow.HelloOrchestra.diagnostics().active);
   });
   fresh.remove();
 };

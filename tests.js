@@ -405,6 +405,7 @@
   await runRecordingTests({ check, assert, same, fourRecord });
   await runModeTests({ check, assert, same, fourRecord, frame, uiAudio, type });
   await runSoundscapeTests({ check, assert, same, frame });
+  await runQuestionTests({ check, assert, same, frame });
   report.textContent = `${lines.join('\n')}\n\n${lines.length - failed}/${lines.length} passed`;
   report.dataset.result = failed ? 'fail' : 'pass';
 })().catch(error => {

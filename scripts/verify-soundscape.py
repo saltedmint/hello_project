@@ -30,7 +30,7 @@ const $=id=>document.getElementById(id), b=HelloSoundscape,D=HelloSoundscapeData
 const assert=value=>{if(!value)throw Error('B browser assertion failed');};
 const wait=async test=>{for(let i=0;i<500;i++){if(test())return;await new Promise(r=>setTimeout(r,10));}throw Error('timeout / '+$('b-feedback').textContent);};
 try{
- $('choose-b').click();
+ $('choose-b-legacy').click();
  if(!sessionStorage.getItem('b-stage')){
    assert(b.getRecords().length===0&&!b.player.context);
    $('b-example-count').value='20';$('b-examples').click();assert(b.getRecords().length===20);

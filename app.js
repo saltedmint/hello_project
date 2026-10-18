@@ -12,17 +12,21 @@
   }
   HelloOrchestra.subscribe(record => { if (!routing) remember(record); });
   function selectMode(next) {
-    if (!['home', 'a', 'b'].includes(next) || next === mode) return;
+    if (!['home', 'a', 'b', 'b-legacy'].includes(next) || next === mode) return;
     importGeneration++;
     if (mode === 'a') HelloOrchestra.leave();
-    if (mode === 'b') HelloSoundscape.leave();
+    if (mode === 'b-legacy') HelloSoundscape.leave();
+    if (mode === 'b') HelloQuestions.leave();
     mode = next;
     $('mode-home').hidden = mode !== 'home'; $('mode-a').hidden = mode !== 'a'; $('mode-b').hidden = mode !== 'b';
+    $('mode-b-legacy').hidden = mode !== 'b-legacy';
     $('mode-nav').hidden = mode === 'home';
-    document.querySelector('.record-tools').hidden = mode === 'b';
-    document.body.classList.toggle('soundscape-open',mode === 'b');
+    document.querySelector('.record-tools').hidden = mode === 'b'||mode === 'b-legacy';
+    document.body.classList.toggle('soundscape-open',mode === 'b-legacy');
+    document.body.classList.toggle('questions-open',mode === 'b');
     $('nav-a').setAttribute('aria-current', mode === 'a' ? 'page' : 'false');
     $('nav-b').setAttribute('aria-current', mode === 'b' ? 'page' : 'false');
+    $('nav-b-legacy').setAttribute('aria-current',mode === 'b-legacy'?'page':'false');
     if (mode === 'a') {
       routing = true;
       try {
@@ -33,7 +37,8 @@
         }
       } finally { routing = false; }
     }
-    if (mode === 'b') HelloSoundscape.enter([...records.values()]);
+    if (mode === 'b-legacy') HelloSoundscape.enter([...records.values()]);
+    if (mode === 'b') HelloQuestions.enter();
   }
   function importText(text) {
     const checked = HelloRecording.parse(text);
@@ -42,7 +47,7 @@
     if (mode === 'a' && !prepared) throw new Error('A에는 네 마디와 Enter 정보가 있는 JSON이 필요합니다. B에서 공통 기록을 불러올 수 있습니다.');
     if (mode === 'a') HelloOrchestra.applyRecord(prepared);
     remember(checked);
-    if (mode === 'b') HelloSoundscape.setRecords([...records.values()]);
+    if (mode === 'b-legacy') HelloSoundscape.setRecords([...records.values()]);
     status(`${checked.source === 'example' ? '예시(실제 참여자 아님)' : 'JSON 기록'}를 불러왔습니다. 원본 시각을 보존합니다.`);
     return checked;
   }
@@ -58,8 +63,10 @@
   }
   $('choose-a').addEventListener('click', () => selectMode('a'));
   $('choose-b').addEventListener('click', () => selectMode('b'));
+  $('choose-b-legacy').addEventListener('click',()=>selectMode('b-legacy'));
   $('nav-a').addEventListener('click', () => selectMode('a'));
   $('nav-b').addEventListener('click', () => selectMode('b'));
+  $('nav-b-legacy').addEventListener('click',()=>selectMode('b-legacy'));
   $('nav-home').addEventListener('click', () => selectMode('home'));
   $('load-json').addEventListener('click', () => $('json-file').click());
   $('json-file').addEventListener('change', async event => {

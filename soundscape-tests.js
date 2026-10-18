@@ -114,7 +114,7 @@ globalThis.runSoundscapeTests = async ({check,assert,same,frame}) => {
     check(`B 음량 상향:20개 동일 음높이·260음 동시 집중도 클리핑 없음 (peak ${peak.toFixed(3)})`,()=>assert(peak>0&&peak<.98));
     rp.stop();
   }
-  b.store.clear();w.HelloExperiments.selectMode('b');b.setRecords([]);b.player.context=fakeContext();
+  b.store.clear();w.HelloExperiments.selectMode('b-legacy');b.setRecords([]);b.player.context=fakeContext();
   let now=1000;const oldNow=w.performance.now.bind(w.performance);Object.defineProperty(w.performance,'now',{configurable:true,value:()=>now});
   const type=(letter,extra={})=>{for(const type of ['keydown','keyup'])$('b-input-zone').dispatchEvent(new w.KeyboardEvent(type,{...key(letter,extra),bubbles:true,cancelable:true}));};
   $('b-input-start').click();type('x');type('h',{isComposing:true});$('b-input-zone').dispatchEvent(new w.Event('paste',{cancelable:true}));
@@ -149,7 +149,7 @@ globalThis.runSoundscapeTests = async ({check,assert,same,frame}) => {
   check('B 전체삭제:확인거부 보존 ·명시적확인 후 삭제',()=>assert(b.getRecords().length===0));
   b.addRecords([record]);$('b-sound-start').click();await Promise.resolve();await Promise.resolve();await Promise.resolve();w.HelloExperiments.selectMode('a');
   check('B→A:소리·예약·RAF·B리스너 정리 ·A활성',()=>{const s=b.diagnostics();assert(!s.active&&!s.running&&s.voices===0&&s.frame===null&&s.inputBindings===0&&w.HelloOrchestra.diagnostics().active);});
-  w.HelloExperiments.selectMode('b');$('b-input-start').click();type('h');w.dispatchEvent(new w.Event('blur'));
+  w.HelloExperiments.selectMode('b-legacy');$('b-input-start').click();type('h');w.dispatchEvent(new w.Event('blur'));
   check('B 입력이탈:부분시도 취소 ·오디오정지',()=>assert($('b-input-letters').querySelectorAll('.b-entered').length===0&&!b.diagnostics().running));
   b.addRecords([D.create(Array.from({length:14},(_,i)=>i*9000),'long-layout')]);
   check('B 긴 입력:각 행 내부 가로 스크롤 · 동일 간격은 동일 자간',()=>{

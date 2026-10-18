@@ -6,6 +6,7 @@
   <title>hello — 당신의 타이핑 리듬</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="modes/soundscape.css">
+  <link rel="stylesheet" href="modes/questions/style.css">
   <script src="assets/drums/embedded.js" defer></script>
   <script src="common/typing.js" defer></script><script src="common/audio.js" defer></script><script src="common/recording.js" defer></script><script src="modes/orchestra-audio.js" defer></script>
   <script src="modes/orchestra-handwriting.js" defer></script>
@@ -15,19 +16,27 @@
   <script src="modes/soundscape-visual.js" defer></script>
   <script src="modes/soundscape-audio.js" defer></script>
   <script src="modes/soundscape.js" defer></script>
+  <script src="modes/questions/config.js" defer></script>
+  <script src="modes/questions/input.js" defer></script>
+  <script src="modes/questions/morse.js" defer></script>
+  <script src="modes/questions/data.js" defer></script>
+  <script src="modes/questions/examples.js" defer></script>
+  <script src="modes/questions/audio.js" defer></script>
+  <script src="modes/questions/visual.js" defer></script>
+  <script src="modes/questions/controller.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
   <main>
     <header><span class="eyebrow">A SMALL EXPERIMENT IN TIMING</span><span class="tag">키보드 실험 · 01</span></header>
-    <nav id="mode-nav" hidden aria-label="실험 모드"><button id="nav-home" class="quiet">← 시작 화면</button><button id="nav-a">A · 인사 오케스트라</button><button id="nav-b">B · 인사 사운드스케이프</button></nav>
+    <nav id="mode-nav" hidden aria-label="실험 모드"><button id="nav-home" class="quiet">← 시작 화면</button><button id="nav-a">A · 인사 오케스트라</button><button id="nav-b">B · 세 질문과 답변의 시간</button><button id="nav-b-legacy" class="quiet">이전 B 실험</button></nav>
     <section id="mode-home" class="mode-home">
       <span class="eyebrow">TWO WAYS TO SAY HELLO</span>
       <h1>하나의 인사,<br>두 가지 소리 실험.</h1>
       <p>타이핑의 간격을 음악으로 바라봅니다. 실험할 방향을 선택하세요.</p>
       <div class="mode-cards">
         <article><span class="mode-letter">A</span><h2>인사 오케스트라</h2><p>나의 네 마디 hello를 타악기로.<br>손글씨 선율과 함께 듣고 WAV로 저장합니다.</p><button id="choose-a" class="primary">A 시작하기 ↗</button></article>
-        <article><span class="mode-letter">B</span><h2>인사 사운드스케이프</h2><p>hello stranger, 저마다 다른 간격.<br>여러 사람의 인사를 고요한 전자음 풍경으로 쌓습니다.</p><span class="pending-badge">이 기기에서 함께 만드는 풍경</span><button id="choose-b">B 시작하기 ↗</button></article>
+        <article><span class="mode-letter">B</span><h2>세 질문과 답변의 시간</h2><p>세 개의 질문, 답변이 되기까지의 시간.<br>한국어와 영어 응답을 모스와 고요한 소리의 풍경으로 쌓습니다.</p><button id="choose-b">B 참여하기 ↗</button><button id="choose-b-legacy" class="quiet">이전 hello stranger 실험</button></article>
       </div>
     </section>
     <section class="record-tools" aria-label="공통 타이핑 기록 JSON">
@@ -84,7 +93,51 @@
       </div>
     </section>
     </div>
-    <section id="mode-b" hidden class="soundscape-entry" aria-labelledby="b-title">
+    <section id="mode-b" hidden aria-labelledby="q-title">
+      <div class="q-mode-heading"><span class="q-eyebrow">B / THREE QUESTIONS, YOUR TIME</span><h1 id="q-title">세 질문과 답변의 시간</h1><button id="q-cancel" hidden>체험 취소</button></div>
+      <section id="q-waiting" class="q-centered">
+        <p class="q-lead">어떤 답은 바로 떠오르고,<br>어떤 답은 시간이 필요합니다.</p>
+        <p>세 개의 질문에 답하고, 응답이 되기까지의 시간을 남깁니다.</p>
+        <div class="q-actions"><button id="q-begin" class="q-primary">참여 시작</button></div>
+      </section>
+      <section id="q-intro" hidden class="q-centered">
+        <h2>당신의 시간에 답해 주세요.</h2>
+        <p>한국어 또는 영어로 짧게 답할 수 있습니다.<br>정답이나 권장 답변 속도는 없습니다. 실제 이름을 쓸 필요도 없습니다.</p>
+        <p>질문은 하나씩 열립니다. 답변 중에는 소리나 변환 결과가 나오지 않습니다.<br>수정하고, 멈추고, 생각해도 괜찮습니다. 준비가 되면 직접 제출해 주세요.</p>
+        <p class="q-small">완료 후 합류한 응답과 입력·수정 시각은 이 브라우저에 저장됩니다.<br>모스는 암호화가 아니며 익명화나 비밀 보장을 뜻하지 않습니다.</p>
+        <button id="q-intro-start" class="q-primary">첫 질문 보기</button>
+      </section>
+      <section id="q-question" hidden class="q-centered q-writing">
+        <span id="q-number" class="q-eyebrow">1 / 3</span>
+        <h2 id="q-prompt-ko"></h2><p id="q-prompt-en" lang="en"></p>
+        <label for="q-answer" class="q-answer-label">짧은 답변 · 한국어 / English</label>
+        <textarea id="q-answer" rows="3" maxlength="240" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="q-input-note q-feedback"></textarea>
+        <p id="q-input-note" class="q-small">직접 타이핑해 주세요. 삭제와 수정이 가능합니다. 최대 120자이며 시간 제한은 없습니다.</p>
+        <button id="q-submit" class="q-primary">다음 질문</button>
+      </section>
+      <section id="q-results" hidden>
+        <div class="q-result-toolbar">
+          <span id="q-count"></span><div class="q-actions"><button id="q-own-listen">내 응답 듣기</button><button id="q-join">풍경에 합류하기</button><button id="q-join-listen" class="q-primary">모두의 응답과 함께 듣기</button><button id="q-next-visitor">다음 관객 시작</button></div>
+        </div>
+        <div class="q-presentation-controls">
+          <label>비교 <select id="q-person"><option value="all">여러 관객 · 같은 질문 비교</option></select></label>
+          <label>시간축 <select id="q-axis"><option value="morse">모스 변환 결과</option><option value="original">원본 시간축</option></select></label>
+          <label>공통 속도 <select id="q-speed"><option value=".5">0.5×</option><option selected value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label><span id="q-rate">모든 질문 1×</span>
+          <label>음량 <input id="q-volume" type="range" min="0" max="1" step=".01" value=".65"></label>
+          <label><input id="q-follow" type="checkbox" checked>재생 위치 따라가기</label>
+          <button id="q-play-all">Q1 → Q2 → Q3 듣기</button><button id="q-stop" disabled>정지</button><span id="q-audio-status" role="status">정지</span>
+        </div>
+        <p class="q-small">같은 질문의 시작을 맞춥니다. 부호를 읽는 시간에 실제 침묵을 더한 변환이며 원본 타이핑의 실시간 복제는 아닙니다.<br>원본 시간축의 빗금은 포커스 이탈입니다. 미지원 문자는 ◇로 남깁니다. 긴 행은 가로로 이동할 수 있습니다.</p>
+        <div id="q-board" aria-label="Q1 Q2 Q3 응답의 시간과 모스"></div><div id="q-own-details"></div>
+      </section>
+      <p id="q-feedback" role="status">한국어 또는 영어로, 당신의 시간에 답해 주세요.</p>
+      <details id="q-tools"><summary>발표 · 운영 도구</summary>
+        <div class="q-actions"><button id="q-open-landscape">운영: 누적 풍경 보기</button><button id="q-load-examples">발표용 합성 예시 6명 불러오기</button><button id="q-remove-examples">합성 예시만 제거</button><button id="q-download">질문 기록 JSON 다운로드</button><button id="q-upload">질문 기록 JSON 불러오기</button><input id="q-file" type="file" accept=".json,application/json" hidden><button id="q-clear">질문 기록 전체 삭제</button></div>
+        <label><input id="q-show-original" type="checkbox">운영자 확인: 원문을 누적 화면에 표시</label>
+        <p class="q-small">합성 예시의 대기와 멈춤은 설명을 위한 시나리오이며 실제 관객의 일반적 패턴을 주장하지 않습니다.<br>예시에는 Q1에 오래 멈추거나 Q3에 빠르게 답한 경우도 포함합니다. 이전 B 자료는 상단 ‘이전 B 실험’에서 열 수 있습니다.</p>
+      </details>
+    </section>
+    <section id="mode-b-legacy" hidden class="soundscape-entry" aria-labelledby="b-title">
       <aside class="b-sidebar">
       <span class="eyebrow">B / A COLLECTIVE GREETING</span><h1 id="b-title">인사 사운드스케이프</h1>
       <p>같은 인사, 서로 다른 간격. 한 사람씩 입력하고 풍경에 보태 주세요.<br>입력은 조용하게 기록합니다. 공백도 당신의 리듬입니다.</p>
