@@ -97,7 +97,9 @@ export async function api(request,env){
       const round=url.searchParams.get('round')||(await currentRound(env)).id;if(!validId(round))fail(400,'회차가 올바르지 않습니다.');
       const presentation=await env.DB.prepare('SELECT include_demo FROM presentations WHERE id=?').bind(round).first();
       const includeDemo=url.searchParams.get('demo')==='1'||presentation?.include_demo===1;
-      const rows=await env.DB.prepare(`SELECT public_payload,created_at FROM responses WHERE round_id=? AND question_key=? ${includeDemo?'':"AND source='participant'"} ORDER BY created_at DESC,session_id DESC LIMIT 20`).bind(round,key).all();
+      const preferFive=includeDemo&&url.searchParams.get('demo')!=='1'&&!!await env.DB.prepare("SELECT session_id FROM responses WHERE round_id=? AND demo_batch_id='presentation-5-v1' LIMIT 1").bind(round).first();
+      const sourceFilter=!includeDemo?"AND source='participant'":preferFive?"AND (source='participant' OR demo_batch_id='presentation-5-v1')":'';
+      const rows=await env.DB.prepare(`SELECT public_payload,created_at FROM responses WHERE round_id=? AND question_key=? ${sourceFilter} ORDER BY created_at DESC,session_id DESC LIMIT 20`).bind(round,key).all();
       return json({schemaVersion:1,roundId:round,selection:'latest-20-including-self',records:rows.results.map(r=>({...JSON.parse(r.public_payload),serverCreatedAt:r.created_at}))});
     }
     fail(405,'공개 요청에서는 조회와 새 기록 제출만 가능합니다.');

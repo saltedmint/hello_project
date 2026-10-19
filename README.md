@@ -2,6 +2,8 @@
 
 공개 체험: **[Your Type](https://your-type-greetings.sweetwasp128.chatgpt.site)** · [발표용 QR PNG](presentation/your-type-qr.png) · [발표자 관리](https://your-type-greetings.sweetwasp128.chatgpt.site/admin). 관객은 로그인 없이 접속합니다. 서버 저장·누적 조회·모바일 시작/다음/복귀를 연결했으며 로컬 전용 모드와 A 기능도 유지합니다. 배포·환경변수·발표자 관리·JSON 보관과 검증 구분은 [공개 배포 문서](docs/public-deployment.md), 실제 확인 결과는 [배포 검증 기록](presentation/verification.md)을 확인하세요.
 
+현재 발표 회차에는 **기본 합성 데이터 5명·15답변**을 등록했습니다. 실제 응답과 구분해 누적 재생하며 기존 기록은 보존합니다. 모바일 답변은 묶음 입력도 유지하고, Enter 또는 다음 버튼 한 번으로 제출합니다. 이전에 열어 둔 탭은 새로고침하세요.
+
 인사와 응답의 시간을 음악·타이포그래피·모스로 표현합니다. A는 기존 타악기·손글씨 선율, 현재 B는 **세 질문과 답변의 시간**입니다. 기존 `hello stranger`와 임의 문장 실험도 **이전 B 실험**으로 보존했습니다. 브라우저 앱은 외부 라이브러리·API 키 없이 동작하며 음원·폰트를 포함합니다. 공개 B는 같은 HTTPS 호스트의 저장 API와 통신하고, 로컬 전용 모드는 외부 서버로 요청하지 않습니다.
 
 ## A · B 모드와 현재 범위
