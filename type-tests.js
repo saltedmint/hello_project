@@ -104,18 +104,16 @@ globalThis.runTypeTests=async({check,assert,same,frame})=>{
   press({},false);assert(T.diagnostics().state==='Q1');d.dispatchEvent(new w.KeyboardEvent('keyup',{key:'Enter',bubbles:true}));
   check('Your Type:조합 후속 input까지 기다리고 중복/held Enter는 무시',()=>assert(T.diagnostics().state==='Q1'));
   check('입력 효과음:한글 두 활동은 두 음 ·조합 확정/후속 input 중복 없음 ·같은 70ms/음높이/겹침',()=>assert(T.sound.typing.size===2&&T.diagnostics().typingPlayed===2&&[...T.sound.typing].every(v=>v.source.frequency.value===K.typingHz&&Math.abs(v.source.stoppedAt-v.source.startedAt-K.typingToneMs/1000)<1e-8)));
-  await new Promise(resolve=>oldSetTimeout(resolve,10));
-  check('Your Type:IME 확정 Enter는 제출하지 않음 ·별도 다음 버튼 제공',()=>assert(T.diagnostics().state==='Q1'&&!$('yt-next').disabled));
-  press();await wait(()=>T.diagnostics().state==='Q2'&&!T.diagnostics().locked);
-  check('Your Type:확정된 한글은 새 Enter로 제출 ·마지막 음절/시각 보존',()=>assert(T.getSession().answers.length===1&&T.getSession().answers[0].text==='가'&&T.getSession().answers[0].submittedAtMs===90620));
+  await wait(()=>T.diagnostics().state==='Q2'&&!T.diagnostics().locked);
+  check('Your Type:한글 확정과 제출은 Enter 한 번 ·마지막 음절/시각 보존',()=>assert(T.getSession().answers.length===1&&T.getSession().answers[0].text==='가'&&T.getSession().answers[0].submittedAtMs===90620));
   assert(T.sound.typing.size===0);press();assert(T.diagnostics().state==='Q2');time+=800;input('b');input('b ');
   $('yt-answer').dispatchEvent(new w.KeyboardEvent('keydown',{key:'Backspace',bubbles:true}));input('b','deleteContentBackward');
   for(const key of ['Shift','Control','ArrowLeft'])$('yt-answer').dispatchEvent(new w.KeyboardEvent('keydown',{key,bubbles:true}));
   $('yt-answer').dispatchEvent(new w.KeyboardEvent('keydown',{key:'b',repeat:true,bubbles:true,cancelable:true}));
   $('yt-answer').dispatchEvent(new w.Event('paste',{bubbles:true,cancelable:true}));
   check('입력 효과음:공백 포함 ·삭제/수정키/반복/붙여넣기는 추가 음 없음',()=>assert(T.diagnostics().typingPlayed===2&&T.sound.typing.size===2));
-  time+=500;press({keyCode:229});assert(T.diagnostics().state==='Q2');$('yt-next').click();await wait(()=>T.diagnostics().state==='Q3'&&!T.diagnostics().locked);
-  check('Your Type:229 Enter는 IME에 맡기고 다음 버튼으로 한 번에 제출',()=>assert(T.getSession().answers.length===2));
+  time+=500;press({keyCode:229});await wait(()=>T.diagnostics().state==='Q3'&&!T.diagnostics().locked);
+  check('Your Type:조합이 끝난 229 Enter도 한 번에 제출',()=>assert(T.getSession().answers.length===2));
   time+=1200;input('c');time+=600;press();await wait(()=>!!processingCallback);
   check('Your Type:Q3 후 자동 저장 ·빈 답변 거부 ·처리중 Enter 무시 ·5초 타이머',()=>{
     assert(w.HelloQuestions.store.records.length===2&&T.diagnostics().state==='processing');press();assert(T.diagnostics().state==='processing'&&K.processingMs===5000);
@@ -164,5 +162,19 @@ globalThis.runTypeTests=async({check,assert,same,frame})=>{
   const second=T.getSequence();clock.currentTime=T.player.startedAt+second.durationMs/1000+.1;T.player.tick();await wait(()=>T.diagnostics().state==='blackout');
   const lateEnding=endingCallback;assert(T.diagnostics().endingTimer!==null);w.HelloExperiments.selectMode('a');lateEnding();
   check('종료 안내 예약 중 A 이탈:타이머 취소 ·늦은 콜백은 안내/오디오를 되살리지 않음',()=>assert(T.diagnostics().endingTimer===null&&$('yt-return-prompt').hidden&&T.sound.typing.size===0&&T.sound.ambient.size===0&&!T.diagnostics().active));
+  w.HelloExperiments.selectMode('b');press();time+=200;await wait(()=>T.diagnostics().state==='Q1'&&!T.diagnostics().locked);
+  $('yt-answer').dispatchEvent(new w.CompositionEvent('compositionstart',{bubbles:true}));input('안녕','insertCompositionText',true);
+  $('yt-next').dispatchEvent(new w.PointerEvent('pointerdown',{button:0,isPrimary:true,bubbles:true,cancelable:true}));$('yt-next').click();
+  await wait(()=>T.diagnostics().state==='Q2'&&!T.diagnostics().locked);
+  check('모바일 묶음 조합:답변 초기화 없음 ·compositionend 누락에도 한 번 제출 ·타격 추정 없음',()=>{
+    const a=T.getSession().answers[0];assert(a.text==='안녕'&&a.recordingVersion==='dom-activity-v3'&&a.typingActivities.length===1&&a.events.some(e=>e.type==='compositionfinalize'));
+  });
+  input('hello');press({isComposing:true,keyCode:229},false);input('hello');
+  d.dispatchEvent(new w.KeyboardEvent('keyup',{key:'Process',keyCode:229,bubbles:true}));
+  await wait(()=>T.diagnostics().state==='Q3'&&!T.diagnostics().locked);
+  check('모바일 묶음 입력:후속 input/229 키 해제 후 중복 없이 한 번 제출',()=>assert(T.getSession().answers[1].text==='hello'&&T.getSession().answers[1].typingActivities.length===1&&!T.diagnostics().enterHeld));
+  $('yt-answer').dispatchEvent(new w.CompositionEvent('compositionstart',{bubbles:true}));input('감사','insertCompositionText',true);$('yt-next').dispatchEvent(new w.PointerEvent('pointerdown',{button:0,bubbles:true,cancelable:true}));
+  w.HelloExperiments.selectMode('a');await new Promise(resolve=>oldSetTimeout(resolve,100));
+  check('모바일 제출 대기 중 A 이동:늦은 조합 확정/타이머가 다음 화면을 되살리지 않음',()=>assert(!T.diagnostics().active&&T.diagnostics().bindings===0&&T.sound.typing.size===0&&w.HelloOrchestra.diagnostics().active));
   w.setTimeout=oldSetTimeout;Object.defineProperty(w.performance,'now',{configurable:true,value:oldNow});w.HelloQuestions.store.clear();w.HelloExperiments.selectMode('home');
 };

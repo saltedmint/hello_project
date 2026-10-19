@@ -15,7 +15,7 @@
   function initialize(refresh=false){
     if(!enabled)return Promise.resolve();
     if(refresh)initializing=null;
-    return initializing ||= request('/api/config').then(config=>{if(!config.round?.id)throw Error('서버 설정을 확인하지 못했습니다.');round=config.round;try{localStorage.setItem(roundKey,JSON.stringify(round));}catch{}display(read().length?'미전송 기록이 기기에 있습니다. 다시 보내기를 눌러 주세요.':'서버 연결됨 · 답변은 완료 후 저장합니다.');}).catch(()=>display('서버 연결을 확인하지 못했습니다. 개인 체험은 계속할 수 있습니다.'));
+    return initializing ||= request('/api/config').then(config=>{if(!config.round?.id)throw Error('서버 설정을 확인하지 못했습니다.');round=config.round;try{localStorage.setItem(roundKey,JSON.stringify(round));}catch{}display(read().length?'미전송 기록이 기기에 있습니다. 다시 보내기를 눌러 주세요.':round.includeDemo?'서버 연결됨 · 발표용 합성 데이터가 함께 재생됩니다.':'서버 연결됨 · 답변은 완료 후 저장합니다.');}).catch(()=>display('서버 연결을 확인하지 못했습니다. 개인 체험은 계속할 수 있습니다.'));
   }
   function enqueue(record,roundId){const values=read();if(!values.some(v=>v.roundId===roundId&&v.record.id===record.id))values.push({schemaVersion:1,roundId,record});if(!write(values))display('기기 저장 공간이 부족합니다. 현재 답변은 메모리에만 보존됩니다. 창을 닫지 마세요.');else display('완료한 답변을 서버로 보내는 중입니다.');}
   async function send(item){

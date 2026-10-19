@@ -7,10 +7,23 @@
   let shown=-1,rendered=[],silentStart=0,hiddenAt=null,processingStarted=0,ready=false;
   let mainStart=0,silentDecor=[],nextSilent=0;
   let questionTimer=null,endingTimer=null,typingPlayed=0,blackoutStarted=0;
-  let pendingSubmit=null,submitTimer=null;
+  let pendingSubmit=null,submitTimer=null,compositionTimer=null;
   const online=globalThis.HelloTypeOnline;
   let resultRecords=null;
-  function cancelSubmit(){clearTimeout(submitTimer);submitTimer=null;pendingSubmit=null;}
+  function cancelSubmit(){clearTimeout(submitTimer);clearTimeout(compositionTimer);submitTimer=null;compositionTimer=null;pendingSubmit=null;}
+  function requestSubmit(waitForInput=false){
+    if(!isQuestion()||locked||!recorder||pendingSubmit)return;
+    if(!recorder.composing&&!waitForInput){submit();return;}
+    const request={recorder,generation};pendingSubmit=request;
+    $('yt-answer').blur(); // Let the native IME commit before changing screens.
+    settleSubmit();
+    compositionTimer=setTimeout(()=>{
+      compositionTimer=null;
+      if(pendingSubmit!==request||!active||operator||request.recorder!==recorder||request.generation!==generation)return;
+      if(recorder.composing){rollback(recorder.finalizeComposition($('yt-answer').value,now()));playNewTyping();}
+      settleSubmit();
+    },80);
+  }
   function settleSubmit(){
     if(!pendingSubmit||recorder?.composing||submitTimer!==null)return;
     const request=pendingSubmit;
@@ -18,6 +31,7 @@
     submitTimer=setTimeout(()=>{
       submitTimer=null;
       if(pendingSubmit!==request)return;
+      clearTimeout(compositionTimer);compositionTimer=null;
       pendingSubmit=null;
       if(active&&!operator&&request.recorder===recorder&&request.generation===generation)submit();
     },0);
@@ -62,7 +76,7 @@
     const activate=()=>{
       if(!active||operator||token!==generation||state!==q.id)return;
       if(now()<readyAt){requestAnimationFrame(activate);return;}
-      recorder=new HelloQuestionInput.Recorder(now());area.disabled=false;locked=false;$('yt-next').disabled=false;area.focus();
+      recorder=new HelloQuestionInput.Recorder(now(),{recordingVersion:'dom-activity-v3'});area.disabled=false;locked=false;$('yt-next').disabled=false;area.focus();
     };
     const chars=Array.from(q.ko);let count=0;
     const reveal=()=>{
@@ -75,7 +89,7 @@
   }
   function playNewTyping(){
     if(!recorder)return;
-    const activities=HelloQuestionInput.collectTyping(recorder.events);
+    const activities=HelloQuestionInput.collectTyping(recorder.events,{grouped:recorder.recordingVersion==='dom-activity-v3'});
     for(let i=typingPlayed;i<activities.length;i++)sound.playTyping();
     typingPlayed=activities.length;
   }
@@ -212,9 +226,7 @@
     }
     if(event.repeat||enterHeld){event.preventDefault();return;}enterHeld=true;
     if(isQuestion()&&!locked&&event.target===$('yt-answer')&&recorder){
-      // IME Enter confirms only. A fresh Enter or the Next button submits.
-      if(event.isComposing||recorder.composing||event.keyCode===229)return;
-      event.preventDefault();submit();return;
+      event.preventDefault();requestSubmit(event.isComposing||event.keyCode===229);return;
     }
     if(event.isComposing||event.keyCode===229)return;
     event.preventDefault();
@@ -231,12 +243,12 @@
     const area=$('yt-answer');
     if(window.visualViewport){const resize=()=>document.documentElement.style.setProperty('--yt-viewport-height',`${window.visualViewport.height}px`);bind(window.visualViewport,'resize',resize);resize();}
     bind(document,'keydown',onKey,true);
-    bind(document,'keyup',event=>{if(event.key==='Enter'||event.code==='Enter'||event.code==='NumpadEnter')enterHeld=false;else if(isQuestion()&&recorder&&event.target===area)recorder.keyUp(now());});
+    bind(document,'keyup',event=>{if(event.key==='Enter'||event.code==='Enter'||event.code==='NumpadEnter'||(enterHeld&&event.keyCode===229))enterHeld=false;else if(isQuestion()&&recorder&&event.target===area)recorder.keyUp(now());});
     bind(area,'beforeinput',event=>{
       if(!recorder||locked){event.preventDefault();return;}
       if(event.inputType==='insertLineBreak'||event.inputType==='insertParagraph'){event.preventDefault();return;}
       recorder.before(event.inputType,event.data,now(),selection());
-      if(['insertFromPaste','insertFromDrop','insertReplacementText','insertFromYank'].includes(event.inputType)||(!recorder.composing&&!event.isComposing&&event.data&&Array.from(event.data).length>1)){
+      if(['insertFromPaste','insertFromDrop','insertFromYank'].includes(event.inputType)){
         event.preventDefault();recorder.blocked(now(),event.inputType);message('여러 글자를 한 번에 넣지 않고 직접 입력해 주세요.');
       }
     });
@@ -268,8 +280,8 @@
   function closeOperator(){if(!operator)return;leave();enter();}
   $('yt-sound-enable').addEventListener('click',async()=>{try{if(await sound.enable())refreshSettings();}catch(error){message(`사운드 활성화 실패: ${error.message}. 무음으로 진행할 수 있습니다.`);}});
   $('yt-touch-start').addEventListener('click',()=>{if(state!=='main'||locked)return;sound.enable().then(refreshSettings).catch(()=>message('사운드를 켜지 못했습니다. 무음으로 진행합니다.'));begin();});
-  $('yt-next').addEventListener('pointerdown',()=>{if(recorder?.composing){pendingSubmit={recorder,generation};$('yt-answer').blur();}});
-  $('yt-next').addEventListener('click',()=>{if(recorder?.composing){pendingSubmit={recorder,generation};$('yt-answer').blur();return;}if(pendingSubmit)settleSubmit();else submit();});
+  $('yt-next').addEventListener('pointerdown',event=>{if(event.button!==0||locked)return;event.preventDefault();requestSubmit();});
+  $('yt-next').addEventListener('click',()=>requestSubmit());
   $('yt-return-prompt').addEventListener('click',()=>{if(state==='ended')main();});
   $('yt-send-retry').addEventListener('click',()=>online?.retry());
   $('yt-expression').value='dots';

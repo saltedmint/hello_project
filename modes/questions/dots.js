@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   function compile(answer){
-    const modern=answer.recordingVersion==='dom-typing-v2';
+    const modern=['dom-typing-v2','dom-activity-v3'].includes(answer.recordingVersion);
     const source=modern?answer.typingActivities:answer.characters.slice().sort((a,b)=>a.atMs-b.atMs);
     const events=source.map((event,index)=>({atMs:event.atMs,durationMs:HelloQuestionConfig.dotDurationMs,activityIndex:index}));
     return {events,durationMs:Math.max(answer.submittedAtMs,...events.map(e=>e.atMs+e.durationMs)),

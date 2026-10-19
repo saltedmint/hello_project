@@ -133,7 +133,7 @@ def run(server,protocol,timeout=35):
                     for answer in participant['answers']:
                         assert ''.join(c['char'] for c in answer['characters'])==answer['text']
                         assert answer['firstActivityMs']>=0 and answer['submittedAtMs']>=answer['lastTextInputMs']
-                        assert answer['morse']['durationMs']>=answer['submittedAtMs'] and answer['recordingVersion'] in ('dom-composition-v1','dom-typing-v2')
+                        assert answer['morse']['durationMs']>=answer['submittedAtMs'] and answer['recordingVersion'] in ('dom-composition-v1','dom-typing-v2','dom-activity-v3')
                 print(f'[{protocol}] {reports[0]} / downloaded v2 JSON inspected',flush=True)
             finally:process.terminate();process.wait(timeout=10)
     finally:fixture.unlink()

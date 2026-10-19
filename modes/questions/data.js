@@ -7,12 +7,13 @@
   const MIDI=[60,62,64,67,69,72,74,76,79,81];
   function soundFor(id){const hash=Array.from(id).reduce((n,c)=>Math.imul(n^c.charCodeAt(0),16777619)>>>0,2166136261);return {midi:MIDI[hash%MIDI.length],pan:((hash>>>8)%601-300)/1000};}
   function validateAnswer(value,questionId) {
-    if(!value||value.questionId!==questionId||!Number.isInteger(value.questionVersion)||value.questionVersion<1||!['dom-composition-v1','dom-typing-v2'].includes(value.recordingVersion))fail('질문 ID·버전·입력 기록 버전을 확인해 주세요.');
+    if(!value||value.questionId!==questionId||!Number.isInteger(value.questionVersion)||value.questionVersion<1||!['dom-composition-v1','dom-typing-v2','dom-activity-v3'].includes(value.recordingVersion))fail('질문 ID·버전·입력 기록 버전을 확인해 주세요.');
     if(!value.question||!['ko','en'].every(k=>typeof value.question[k]==='string'&&value.question[k].length>0&&value.question[k].length<=500))fail('질문 원문이 없습니다.');
     if(typeof value.text!=='string'||!value.text.trim()||Array.from(value.text).length>C.maxCharacters||!finite(value.submittedAtMs))fail('답변 또는 제출 시각이 올바르지 않습니다.');
     if(!Array.isArray(value.events)||value.events.length>10000||!Array.isArray(value.characters)||!Array.isArray(value.focusLoss))fail('입력 로그가 올바르지 않습니다.');
     let previous=0,characters=[],text='',first=null,last=null,openFocus=null;const focusLoss=[];
-    const types=['beforeinput','input','compositionstart','compositionupdate','compositionend','commit','activity','blocked','focusout','focusin','keydown','keyup'];
+    const grouped=value.recordingVersion==='dom-activity-v3';
+    const types=['beforeinput','input','compositionstart','compositionupdate','compositionend','commit','activity','blocked','focusout','focusin','keydown','keyup',...(grouped?['compositionfinalize']:[])];
     for(const event of value.events){
       if(!event||!types.includes(event.type)||!finite(event.atMs)||event.atMs<previous||event.atMs>value.submittedAtMs)fail('이벤트 시각 순서 또는 종류가 올바르지 않습니다.');
       previous=event.atMs;
@@ -24,7 +25,7 @@
         if(typeof event.value!=='string'||Array.from(event.value).length>C.maxCharacters)fail('수정 이벤트가 올바르지 않습니다.');
         if(event.selection){const {start,end}=event.selection;if(!Number.isInteger(start)||!Number.isInteger(end)||start<0||end<start||end>characters.length)fail('수정 선택 영역이 올바르지 않습니다.');}
         const edit=I.editCharacters(characters,event.value,event.atMs,event.selection);
-        if(edit.added.length>1||edit.added.join('')!==event.added||edit.removed.join('')!==event.removed)fail('여러 글자 입력 또는 수정 로그가 일치하지 않습니다.');
+        if((!grouped&&edit.added.length>1)||edit.added.join('')!==event.added||edit.removed.join('')!==event.removed)fail('여러 글자 입력 또는 수정 로그가 일치하지 않습니다.');
         characters=edit.characters;text=event.value;
       }
       if(event.type==='focusout'){if(openFocus)fail('포커스 이탈 로그가 겹칩니다.');openFocus={fromMs:event.atMs,reason:event.reason};}
@@ -34,8 +35,8 @@
     if(characters.some(c=>!finite(c.atMs)||c.atMs>last)||last>value.submittedAtMs)fail('문자 시각 범위가 올바르지 않습니다.');
     const result={questionId:value.questionId,questionVersion:value.questionVersion,question:clone(value.question),recordingVersion:value.recordingVersion,text:value.text,
       characters:clone(value.characters),events:clone(value.events),firstActivityMs:first,lastTextInputMs:last,submittedAtMs:value.submittedAtMs,focusLoss:clone(focusLoss)};
-    if(value.recordingVersion==='dom-typing-v2'){
-      const activities=I.collectTyping(value.events);
+    if(value.recordingVersion==='dom-typing-v2'||grouped){
+      const activities=I.collectTyping(value.events,{grouped});
       if(!equal(activities,value.typingActivities))fail('입력 활동 로그와 원본 이벤트가 일치하지 않습니다.');
       if(activities.some((e,i)=>!finite(e.atMs)||e.atMs>value.submittedAtMs||(i&&e.atMs<activities[i-1].atMs)))fail('입력 활동 시각을 확인해 주세요.');
       result.typingActivities=activities;

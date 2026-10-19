@@ -22,26 +22,26 @@
   }
   // One canonical activity per observed insertion. Key timestamps are used only
   // after an input confirms that the key actually produced text.
-  function collectTyping(events) {
+  function collectTyping(events,{grouped=false}={}) {
     const result=[];let key=null,observed='';
     events.forEach((e,index)=>{
       if(e.type==='keydown'){key={...e,index};return;}
       if(e.type==='keyup'){key=null;return;}
       if(e.type==='blocked'){key=null;return;}
-      if(!['input','compositionend'].includes(e.type)||typeof e.value!=='string')return;
+      if(!['input','compositionend',...(grouped?['compositionfinalize']:[])].includes(e.type)||typeof e.value!=='string')return;
       const type=e.inputType||'insertCompositionText';
       if(/delete/i.test(type)||['Backspace','Delete'].includes(key?.key)||['Backspace','Delete'].includes(key?.code)){observed=e.value;key=null;return;}
-      if(!['input','insertText','insertCompositionText','insertFromComposition'].includes(type)){key=null;return;}
+      if(!['input','insertText','insertCompositionText','insertFromComposition',...(grouped?['insertReplacementText']:[])].includes(type)){key=null;return;}
       const edit=editCharacters(Array.from(observed).map(char=>({char})),e.value,0);
       const blocked=events.slice(index+1,index+5).some(n=>n.atMs===e.atMs&&n.type==='blocked');
-      const physical=key?.eligible&&!key.repeat&&key.atMs<=e.atMs;
-      const insertion=edit.added.length===1&&e.value!==observed;
+      const physical=key?.eligible&&!key.repeat&&key.atMs<=e.atMs&&edit.added.length<=1&&type!=='insertReplacementText';
+      const insertion=(grouped?edit.added.length>0:edit.added.length===1)&&e.value!==observed;
       const sameValueHit=physical&&e.type==='input'&&e.value===observed;
       if((insertion||sameValueHit)&&!key?.repeat&&!blocked&&Array.from(e.value).length<=C.maxCharacters){
         result.push({atMs:physical?key.atMs:e.atMs,eventIndex:index,keyEventIndex:physical?key.index:null,unit:physical?'physical-key':'observed-input'});
       }
       // compositionend and its following input carry the same value: no double hit.
-      if(!blocked&&edit.added.length<=1)observed=e.value;
+      if(!blocked&&(grouped||edit.added.length<=1))observed=e.value;
       key=null;
     });
     return result;
@@ -70,7 +70,7 @@
       const selection=this.pendingSelection;this.pendingSelection=null;
       const edit=editCharacters(this.characters,value,this.elapsed(now),selection);
       if(Array.from(value).length>C.maxCharacters) {this.blocked(now,'answer-too-long');return {blocked:true,reason:'answer-too-long'};}
-      if(edit.added.length>1) {this.blocked(now,'bulk-text');return {blocked:true};}
+      if(edit.added.length>1&&this.recordingVersion!=='dom-activity-v3') {this.blocked(now,'bulk-text');return {blocked:true};}
       this.activity(now,kind);
       this.characters=edit.characters;this.text=value;
       this.log('commit',now,{value,added:edit.added.join(''),removed:edit.removed.join(''),kind,selection});
@@ -78,13 +78,21 @@
     }
     input(value,type,now,isComposing=false) {
       this.log('input',now,{value,inputType:type,isComposing});
+      if(['insertFromPaste','insertFromDrop','insertFromYank'].includes(type)||(type==='insertReplacementText'&&this.recordingVersion!=='dom-activity-v3')){this.blocked(now,type);return {blocked:true};}
+      if(this.recordingVersion==='dom-activity-v3'&&isComposing)this.composing=true;
       if(this.composing||isComposing){this.activity(now,'composition-input');return {composing:true};}
-      if(['insertFromPaste','insertFromDrop','insertReplacementText','insertFromYank'].includes(type)){this.blocked(now,type);return {blocked:true};}
       return this.apply(value,now,type||'input');
     }
     compositionStart(now,selection) {this.composing=true;this.pendingSelection=selection?{...selection,inputType:'insertCompositionText'}:null;this.log('compositionstart',now);this.activity(now,'compositionstart');}
     compositionUpdate(data,now) {this.log('compositionupdate',now,{data:data??''});if(data)this.activity(now,'compositionupdate');}
     compositionEnd(value,data,now) {this.composing=false;this.log('compositionend',now,{data:data??'',value});return this.apply(value,now,'compositionend');}
+    finalizeComposition(value,now) {
+      // Explicit observation after submit-triggered blur, not a fabricated IME
+      // event or reconstructed key. Some mobile IMEs omit compositionend.
+      if(this.recordingVersion!=='dom-activity-v3')return {blocked:true};
+      this.composing=false;this.log('compositionfinalize',now,{value,reason:'submit-blur-snapshot'});
+      return this.apply(value,now,'compositionfinalize');
+    }
     loseFocus(now,reason) {if(this.openFocus)return;this.openFocus={fromMs:this.elapsed(now),reason};this.log('focusout',now,{reason});}
     gainFocus(now) {if(!this.openFocus)return;this.focusLoss.push({...this.openFocus,toMs:this.elapsed(now)});this.openFocus=null;this.log('focusin',now);}
     finish(question,now) {
@@ -93,7 +101,7 @@
       if(this.events.length>10000)throw Error('입력 기록이 너무 큽니다. 이 질문을 다시 시작해 주세요.');
       this.gainFocus(now);
       return {questionId:question.id,questionVersion:question.version,question:{ko:question.ko,en:question.en},recordingVersion:this.recordingVersion,
-        ...(this.recordingVersion==='dom-typing-v2'?{typingActivities:collectTyping(this.events)}:{}),
+        ...(['dom-typing-v2','dom-activity-v3'].includes(this.recordingVersion)?{typingActivities:collectTyping(this.events,{grouped:this.recordingVersion==='dom-activity-v3'})}:{}),
         text:this.text,characters:this.characters.map(c=>({...c})),events:JSON.parse(JSON.stringify(this.events)),
         firstActivityMs:this.firstActivityMs,lastTextInputMs:this.lastTextInputMs,submittedAtMs:this.elapsed(now),focusLoss:this.focusLoss.map(x=>({...x}))};
     }

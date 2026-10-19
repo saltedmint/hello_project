@@ -71,12 +71,14 @@ export async function api(request,env){
         return json({active:value.id});
       }
       if(path==='/api/admin/demo'&&method==='POST'){
-        const batch=HelloQuestionDemo.buildBatch();for(const record of batch)await insert(env,round,record);
-        return json({batchId:HelloQuestionDemo.batchId,participants:10,answers:30,roundId:round});
+        const value=await body(request),five=value.batchId===HelloQuestionDemo.fiveBatchId;
+        if(value.batchId&&![HelloQuestionDemo.batchId,HelloQuestionDemo.fiveBatchId].includes(value.batchId))fail(400,'지원하지 않는 합성 배치입니다.');
+        const batch=five?HelloQuestionDemo.buildFive():HelloQuestionDemo.buildBatch();for(const record of batch)await insert(env,round,record);
+        return json({batchId:five?HelloQuestionDemo.fiveBatchId:HelloQuestionDemo.batchId,participants:batch.length,answers:batch.length*3,roundId:round});
       }
       if(path==='/api/admin/demo'&&method==='DELETE'){
-        const value=await body(request);if(value.confirm!==HelloQuestionDemo.batchId)fail(400,'배치 삭제 확인이 필요합니다.');
-        await env.DB.prepare('DELETE FROM responses WHERE round_id=? AND source=? AND demo_batch_id=?').bind(round,'synthetic',HelloQuestionDemo.batchId).run();return json({removedBatch:value.confirm});
+        const value=await body(request);if(![HelloQuestionDemo.batchId,HelloQuestionDemo.fiveBatchId].includes(value.confirm))fail(400,'배치 삭제 확인이 필요합니다.');
+        await env.DB.prepare('DELETE FROM responses WHERE round_id=? AND source=? AND demo_batch_id=?').bind(round,'synthetic',value.confirm).run();return json({removedBatch:value.confirm});
       }
       if(path==='/api/admin/response'&&method==='DELETE'){
         const value=await body(request);if(!validId(value.id)||value.confirm!==value.id||!validId(value.roundId))fail(400,'삭제할 회차와 기록 ID를 확인해 주세요.');

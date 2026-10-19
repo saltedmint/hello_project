@@ -53,5 +53,10 @@
     try{const saved=HelloQuestionData.parse(store.storage.getItem(C.storageKey));persisted=!store.warning&&saved.filter(r=>r.demoBatchId===batchId).length===10&&JSON.stringify(saved)===JSON.stringify(store.getRecords());}catch{}
     return {batchId,added,...counts,persisted};
   }
-  globalThis.HelloQuestionDemo={batchId,buildBatch,seed,query,compositionSteps};
+  const fiveBatchId='presentation-5-v1';
+  function buildFive(){const ten=buildBatch();return [0,2,4,5,7].map((at,i)=>{
+    const record=ten[at],id=`${fiveBatchId}-${String(i+1).padStart(2,'0')}`;
+    return HelloQuestionData.validate({...record,id,demoBatchId:fiveBatchId,sound:HelloQuestionData.soundFor(id)});
+  });}
+  globalThis.HelloQuestionDemo={batchId,buildBatch,seed,query,compositionSteps,fiveBatchId,buildFive};
 })();

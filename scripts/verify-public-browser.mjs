@@ -40,13 +40,23 @@ try{
      for(let q=0;q<3;q++){
        await wait(()=>T.diagnostics().state==='Q'+(q+1)&&!T.diagnostics().locked);const area=$('yt-answer');
        const rect=area.getBoundingClientRect(),button=$('yt-next').getBoundingClientRect();assert(rect.left>=0&&rect.right<=innerWidth+1&&button.top>=0&&button.bottom<=visualViewport.height+1,'mobile input/button fits viewport');
-       await delay(80);for(const char of ['a b','ok','hi'][q]){area.dispatchEvent(new KeyboardEvent('keydown',{key:char,code:char===' '?'Space':'Key'+char.toUpperCase(),bubbles:true}));area.value+=char;area.dispatchEvent(new InputEvent('input',{inputType:'insertText',bubbles:true}));area.dispatchEvent(new KeyboardEvent('keyup',{key:char,bubbles:true}));await delay(30);}
-       $('yt-next').click();
+       await delay(80);
+       if(${i===1}&&q===1){
+         area.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));
+         const before=new InputEvent('beforeinput',{inputType:'insertCompositionText',data:'안녕',isComposing:true,bubbles:true,cancelable:true});area.dispatchEvent(before);assert(!before.defaultPrevented,'grouped native IME allowed');
+         area.value='안녕';area.dispatchEvent(new InputEvent('input',{inputType:'insertCompositionText',isComposing:true,bubbles:true}));
+         $('yt-next').dispatchEvent(new PointerEvent('pointerdown',{button:0,isPrimary:true,bubbles:true,cancelable:true}));
+         $('yt-next').click(); // No native compositionend: explicit blur snapshot fallback.
+       }else {
+         for(const char of ['a b','ok','hi'][q]){area.dispatchEvent(new KeyboardEvent('keydown',{key:char,code:char===' '?'Space':'Key'+char.toUpperCase(),bubbles:true}));area.value+=char;area.dispatchEvent(new InputEvent('input',{inputType:'insertText',bubbles:true}));area.dispatchEvent(new KeyboardEvent('keyup',{key:char,bubbles:true}));await delay(30);}
+         if(${i===0}){area.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',bubbles:true,cancelable:true}));area.dispatchEvent(new KeyboardEvent('keyup',{key:'Enter',code:'Enter',bubbles:true}));}else $('yt-next').click();
+       }
      }
      await wait(()=>T.diagnostics().state==='playing');const own=T.getSession().record,plan=T.getSequence();
      assert(plan.segments.length===9&&plan.snapshot.filter(r=>r.id===own.id).length===1,'9 stages and own once');
      assert(HelloTypeOnline.pending()===0,'server receipt clears outbox');assert(T.sound.ambientStarts===1,'persistent ambience');
      assert(own.answers[0].typingActivities.length===3,'space included');
+     if(${i===1})assert(own.answers[1].text==='안녕'&&own.answers[1].typingActivities.length===1&&own.answers[1].recordingVersion==='dom-activity-v3'&&own.answers[1].events.some(e=>e.type==='compositionfinalize'),'mobile grouped composition retained without invented key times');
      const round=HelloTypeOnline.getRound().id;
      const retry=await fetch('/api/responses',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({schemaVersion:1,roundId:round,record:own})});assert(retry.ok,'retry accepted');
      const view=await (await fetch('/api/responses?round='+round)).json();assert(view.records.filter(r=>r.id===own.id).length===1,'retry no duplicate');
