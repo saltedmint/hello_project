@@ -6,7 +6,7 @@ const prelude=(await Promise.all(shared.map(p=>readFile(path.join(root,p),'utf8'
 const entries=[];
 async function walk(dir){for(const item of await readdir(path.join(root,dir),{withFileTypes:true})){const p=`${dir}/${item.name}`;if(item.isDirectory())await walk(p);else entries.push(p);}}
 for(const dir of ['assets','common','modes'])await walk(dir);
-entries.push('index.html','styles.css','app.js','admin.html','admin.js');
+entries.push('index.html','styles.css','app.js','admin.html','admin.js','admin.css');
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.wav':'audio/wav','.woff2':'font/woff2','.woff':'font/woff','.ttf':'font/ttf','.txt':'text/plain; charset=utf-8'};
 const assets={};
 for(const p of entries){let bytes=await readFile(path.join(root,p));if(p==='index.html')bytes=Buffer.from(bytes.toString().replace('<head>','<head><script>globalThis.YOUR_TYPE_PUBLIC=true;</script>'));assets['/'+p]=[mime[path.extname(p)]||'application/octet-stream',bytes.toString('base64')];}

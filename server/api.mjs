@@ -60,6 +60,34 @@ export async function api(request,env){
     if(path.startsWith('/api/admin/')){
       if(!await owner(request,env))fail(403,'발표자 로그인이 필요합니다.');
       const round=(await currentRound(env)).id;
+      async function targetRound(value){
+        const id=value||round;if(!validId(id))fail(400,'회차 ID가 올바르지 않습니다.');
+        if(id!==(env.CURRENT_ROUND_ID||'presentation-2026')&&!await env.DB.prepare('SELECT id FROM presentations WHERE id=?').bind(id).first())fail(400,'존재하지 않는 회차입니다.');
+        return id;
+      }
+      if(path==='/api/admin/records'&&method==='GET'){
+        const selected=url.searchParams.get('round')||round,source=url.searchParams.get('source')||'all',search=(url.searchParams.get('search')||'').trim();
+        const limit=Number(url.searchParams.get('limit')||20),offset=Number(url.searchParams.get('offset')||0);
+        if((selected!=='all'&&!validId(selected))||!['all','participant','synthetic'].includes(source)||search.length>200||!Number.isInteger(limit)||limit<1||limit>50||!Number.isSafeInteger(offset)||offset<0||offset>1000000)fail(400,'목록 조회 조건이 올바르지 않습니다.');
+        const where=[],args=[];if(selected!=='all'){where.push('round_id=?');args.push(selected);}if(source!=='all'){where.push('source=?');args.push(source);}
+        if(search){where.push("(instr(lower(session_id),lower(?))>0 OR instr(lower(json_extract(payload,'$.answers[0].text')),lower(?))>0 OR instr(lower(json_extract(payload,'$.answers[1].text')),lower(?))>0 OR instr(lower(json_extract(payload,'$.answers[2].text')),lower(?))>0)");args.push(search,search,search,search);}
+        const filter=where.length?'WHERE '+where.join(' AND '):'';
+        const counts=await env.DB.prepare(`SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN source='participant' THEN 1 ELSE 0 END),0) AS actual,COALESCE(SUM(CASE WHEN source='synthetic' THEN 1 ELSE 0 END),0) AS demo FROM responses ${filter}`).bind(...args).first();
+        const fields=[0,1,2].map(i=>{const p=`$.answers[${i}]`;return `json_object('questionId',json_extract(payload,'${p}.questionId'),'questionVersion',json_extract(payload,'${p}.questionVersion'),'text',json_extract(payload,'${p}.text'),'firstActivityMs',json_extract(payload,'${p}.firstActivityMs'),'submittedAtMs',json_extract(payload,'${p}.submittedAtMs'),'recordingVersion',json_extract(payload,'${p}.recordingVersion'),'activityCount',COALESCE(json_array_length(json_extract(payload,'${p}.typingActivities')),json_array_length(json_extract(payload,'${p}.characters'))))`;});
+        const rows=await env.DB.prepare(`SELECT round_id,session_id,source,demo_batch_id,created_at,json_array(${fields.join(',')}) AS summary FROM responses ${filter} ORDER BY created_at DESC,session_id DESC LIMIT ? OFFSET ?`).bind(...args,limit,offset).all();
+        return json({records:rows.results.map(r=>({id:r.session_id,roundId:r.round_id,source:r.source,isDemo:r.source==='synthetic',demoBatchId:r.demo_batch_id,createdAt:r.created_at,answers:JSON.parse(r.summary)})),counts,limit,offset,hasMore:offset+rows.results.length<counts.total});
+      }
+      if(path==='/api/admin/record'&&method==='GET'){
+        const id=url.searchParams.get('id'),selected=url.searchParams.get('round');if(!validId(id)||!validId(selected))fail(400,'회차와 기록 ID를 확인해 주세요.');
+        const row=await env.DB.prepare('SELECT payload,created_at FROM responses WHERE round_id=? AND session_id=?').bind(selected,id).first();if(!row)fail(404,'기록이 없거나 이미 삭제됐습니다.');
+        return json({roundId:selected,createdAt:row.created_at,record:JSON.parse(row.payload)});
+      }
+      if(path==='/api/admin/records'&&method==='DELETE'){
+        const value=await body(request);if(value.confirm!=='delete-selected'||!Array.isArray(value.records)||!value.records.length||value.records.length>50||value.records.some(r=>!validId(r?.id)||!validId(r?.roundId)))fail(400,'선택한 1~50개 기록의 삭제 확인이 필요합니다.');
+        const unique=[...new Map(value.records.map(r=>[JSON.stringify([r.roundId,r.id]),r])).values()];
+        const results=await env.DB.batch(unique.map(r=>env.DB.prepare('DELETE FROM responses WHERE round_id=? AND session_id=?').bind(r.roundId,r.id)));
+        return json({deleted:results.reduce((n,r)=>n+Number(r.meta?.changes||0),0)});
+      }
       if(path==='/api/admin/export'&&method==='GET'){
         const rows=await env.DB.prepare('SELECT round_id,created_at,payload FROM responses ORDER BY created_at,session_id').all();
         return json({schemaVersion:1,kind:'your-type-server-backup',records:rows.results.map(r=>({roundId:r.round_id,createdAt:r.created_at,record:JSON.parse(r.payload)}))});
@@ -73,12 +101,12 @@ export async function api(request,env){
       if(path==='/api/admin/demo'&&method==='POST'){
         const value=await body(request),five=value.batchId===HelloQuestionDemo.fiveBatchId;
         if(value.batchId&&![HelloQuestionDemo.batchId,HelloQuestionDemo.fiveBatchId].includes(value.batchId))fail(400,'지원하지 않는 합성 배치입니다.');
-        const batch=five?HelloQuestionDemo.buildFive():HelloQuestionDemo.buildBatch();for(const record of batch)await insert(env,round,record);
-        return json({batchId:five?HelloQuestionDemo.fiveBatchId:HelloQuestionDemo.batchId,participants:batch.length,answers:batch.length*3,roundId:round});
+        const selected=await targetRound(value.roundId),batch=five?HelloQuestionDemo.buildFive():HelloQuestionDemo.buildBatch();for(const record of batch)await insert(env,selected,record);
+        return json({batchId:five?HelloQuestionDemo.fiveBatchId:HelloQuestionDemo.batchId,participants:batch.length,answers:batch.length*3,roundId:selected});
       }
       if(path==='/api/admin/demo'&&method==='DELETE'){
         const value=await body(request);if(![HelloQuestionDemo.batchId,HelloQuestionDemo.fiveBatchId].includes(value.confirm))fail(400,'배치 삭제 확인이 필요합니다.');
-        await env.DB.prepare('DELETE FROM responses WHERE round_id=? AND source=? AND demo_batch_id=?').bind(round,'synthetic',value.confirm).run();return json({removedBatch:value.confirm});
+        const selected=await targetRound(value.roundId);await env.DB.prepare('DELETE FROM responses WHERE round_id=? AND source=? AND demo_batch_id=?').bind(selected,'synthetic',value.confirm).run();return json({removedBatch:value.confirm,roundId:selected});
       }
       if(path==='/api/admin/response'&&method==='DELETE'){
         const value=await body(request);if(!validId(value.id)||value.confirm!==value.id||!validId(value.roundId))fail(400,'삭제할 회차와 기록 ID를 확인해 주세요.');

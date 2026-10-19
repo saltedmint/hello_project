@@ -1,1 +1,39 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your Type · 발표자 관리</title><style>body{background:#080808;color:#ddd;font:15px/1.8 system-ui;max-width:760px;padding:32px 20px;margin:auto}button,input{font:inherit;background:#151515;color:#ddd;border:1px solid #666;padding:9px;margin:5px}label{display:block}a{color:#bbb}pre{white-space:pre-wrap;font:13px/1.7 system-ui}section{margin:30px 0;border-top:1px solid #333;padding-top:20px}</style><script src="admin.js" defer></script></head><body><h1>Your Type · 발표자 관리</h1><p>서버가 확인한 발표자 계정만 관리할 수 있습니다. 관객은 로그인 없이 체험합니다.</p><a href="/signin-with-chatgpt?return_to=%2Fadmin" target="_top">발표자 계정으로 로그인</a> · <a href="/">관객 화면</a><pre id="status" role="status">권한 확인 중…</pre><div id="tools" hidden><section><h2>발표 회차</h2><p>새로 시작하는 관객부터 적용합니다. 이미 시작한 체험은 기존 회차로 저장합니다.</p><label>회차 ID <input id="round" placeholder="presentation-2026"></label><label>제목 <input id="title" placeholder="Your Type"></label><button id="switch">이 회차로 전환</button><pre id="rounds"></pre></section><section><h2>발표용 합성 데이터</h2><p>현재 회차의 10인 배치만 추가·삭제합니다. 실제 기록과 별도 저장됩니다. 반복 추가해도 중복되지 않습니다.</p><button id="seed">10명·30답변 추가</button><button id="remove-demo">이 배치만 삭제</button></section><section><h2>기록 보관·삭제</h2><button id="export">전체 회차 JSON 내보내기</button><label>삭제할 회차 ID <input id="delete-round"></label><label>삭제할 세션 ID <input id="delete-id"></label><button id="remove-one">지정 기록 삭제</button><p>다운로드에는 비공개 답변 원문과 수정 로그가 포함됩니다. 안전한 장소에 보관하세요.</p></section></div></body></html>
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Your Type · 서버 기록 관리</title>
+  <link rel="stylesheet" href="admin.css"><script src="admin.js" defer></script>
+</head>
+<body>
+  <header><div><p class="eyebrow">YOUR TYPE / PRESENTER</p><h1>서버 기록 관리</h1></div><a href="/">관객 화면 열기 ↗</a></header>
+  <p id="status" role="status" aria-live="polite">발표자 권한을 확인하고 있습니다.</p>
+  <section id="login-panel"><h2>발표자 로그인</h2><p>응답 원문과 입력 시간은 발표자만 확인할 수 있습니다.</p><a class="button" href="/signin-with-chatgpt?return_to=%2Fadmin" target="_top">발표자 계정으로 로그인</a></section>
+  <main id="tools" hidden>
+    <div class="heading-row"><h2>기록 보관함</h2><span id="active-round" class="muted"></span></div>
+    <form id="filters" class="filters">
+      <label>회차<select id="round-filter"><option value="all">전체 회차</option></select></label>
+      <label>기록 구분<select id="source-filter"><option value="all">전체 기록</option><option value="participant">실제 응답만</option><option value="synthetic">합성 데이터만</option></select></label>
+      <label class="search-label">답변 또는 기록 ID<input id="search" type="search" maxlength="200" placeholder="검색어를 입력하세요"></label>
+      <button type="submit">검색</button><button id="refresh" type="button" class="secondary">새로고침</button>
+    </form>
+    <div class="summary" id="counts" aria-live="polite">기록을 불러오는 중입니다.</div>
+    <div class="heading-row toolbar"><div><button id="delete-selected" class="danger" disabled>선택 삭제</button><span id="selected-count" class="muted">0개 선택</span></div><button id="export" class="secondary">전체 회차 JSON 저장</button></div>
+    <div class="table-scroll" id="record-list" aria-busy="false">
+      <table><caption class="sr-only">서버에 저장된 참가자별 세 질문 응답</caption><thead><tr><th><input id="select-page" type="checkbox" aria-label="현재 페이지의 기록 모두 선택"></th><th>기록</th><th>세 질문의 답변</th><th>저장 시각 <small>한국 시간</small></th><th>관리</th></tr></thead><tbody id="records"></tbody></table>
+      <p id="empty" hidden>이 조건에 맞는 기록이 없습니다.</p>
+    </div>
+    <nav class="pagination" aria-label="기록 페이지"><button id="previous" class="secondary" disabled>이전</button><span id="page-info"></span><button id="next-page" class="secondary" disabled>다음</button></nav>
+    <section class="panel"><div class="heading-row"><h2>더미 데이터 추가·삭제</h2><span id="demo-round" class="muted"></span></div>
+      <p>목록에서 선택한 회차에 적용합니다. 실제 응답과 구분되며 같은 배치를 여러 번 추가해도 중복되지 않습니다.</p>
+      <div class="inline"><label>합성 배치<select id="demo-batch"><option value="presentation-5-v1">기본 5명 · 15답변</option><option value="presentation-10-v1">기존 10명 · 30답변</option></select></label><button id="add-demo">더미 추가</button><button id="remove-demo" class="danger">이 합성 배치만 삭제</button></div>
+      <p class="muted">전체 회차를 보고 있다면 먼저 하나의 회차를 선택하세요. 두 합성 배치가 있으면 관객 재생에는 기본 5인 배치를 우선 사용합니다.</p>
+    </section>
+    <details class="panel"><summary>발표 회차 설정</summary><p>목록의 회차 필터는 조회만 바꿉니다. 아래 버튼을 눌러야 새 관객에게 적용되는 발표 회차가 변경됩니다.</p>
+      <div class="inline"><label>회차 ID<input id="round-id" maxlength="128" placeholder="presentation-2026"></label><label>제목<input id="round-title" maxlength="100" placeholder="Your Type"></label></div>
+      <label class="check-label"><input id="include-demo" type="checkbox">관객의 누적 재생에 합성 데이터 포함</label><button id="switch-round">이 회차를 발표에 적용</button>
+    </details>
+    <p class="muted footnote">원문과 입력 로그가 포함된 JSON은 안전한 곳에 보관하세요. 삭제는 서버에 즉시 반영되며 되돌릴 수 없습니다.</p>
+  </main>
+  <dialog id="record-dialog" aria-labelledby="detail-heading"><div class="heading-row"><h2 id="detail-heading">기록 상세</h2><button id="close-detail" class="secondary" autofocus>닫기</button></div><div id="detail-content"></div><div class="inline"><button id="download-record" class="secondary">이 기록 JSON 저장</button><button id="delete-detail" class="danger">이 기록 삭제</button></div></dialog>
+</body></html>
