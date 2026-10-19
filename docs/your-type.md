@@ -6,7 +6,7 @@
 
 명시적 상태는 `main / Q1 / Q2 / Q3 / processing / playing / blackout / ended`이다. `blackout`은 그래픽 없는 검정 5초, `ended`는 복귀 안내 상태이다. `type-experience.js`가 관객 흐름을 담당하며, 기존 `controller.js`는 설정의 운영/JSON 화면에 남아 같은 Store를 사용한다. 분리된 textarea와 리스너를 사용하고 운영 화면에서는 관객 키 핸들러를 비활성화한다.
 
-Enter는 문서 캡처 단계에서 한 번 처리한다. `repeat`와 누름 상태를 함께 확인하며 keyup 전에는 다음 제출을 허용하지 않는다. **Enter 한 번으로 제출을 요청**하며, 한글 조합 중이면 브라우저의 `compositionend`와 후속 input이 처리된 다음 자동 제출한다. 조합이 끝난 Enter는 이전 IME의 `keyCode 229`만으로 차단하지 않는다. 화면 이탈이나 질문 전환 시 대기 중인 제출을 취소한다. 제출 Enter는 beforeinput 줄바꿈을 차단하며 점·문자로 기록하지 않는다. 한국어 질문은 `questionRevealMs`(65ms)마다 한 글자씩 표시하며 그동안 textarea/Enter를 잠근다. 완료 후 영어 번역을 표시하고 두 프레임을 그린 뒤 입력을 활성화하며 새 `performance.now()` 원점을 잡는다. 질문 출력 시간은 기록에서 제외한다. 출력 타이머는 화면 이탈 시 취소한다. 종료 안내가 나와도 Enter 누름 상태를 초기화하지 않아 계속 누르고 있던 키로 복귀할 수 없다.
+Enter는 문서 캡처 단계에서 한 번 처리한다. `repeat`와 누름 상태를 함께 확인하며 keyup 전에는 다음 제출을 허용하지 않는다. **조합이 끝난 답변은 Enter 한 번 또는 다음/완료 버튼으로 제출**한다. 이번 공개 체험 요구에 따라 한글 조합 중 Enter와 IME 229 Enter는 확정만 하고 제출하지 않는다. 다음 버튼을 누를 때 조합 중이면 브라우저의 `compositionend`와 후속 input을 기다린 뒤 제출한다. 화면 이탈이나 질문 전환 시 대기 중인 제출을 취소한다. 제출 Enter는 beforeinput 줄바꿈을 차단하며 점·문자로 기록하지 않는다. 한국어 질문은 `questionRevealMs`(65ms)마다 한 글자씩 표시하며 그동안 textarea/Enter를 잠근다. 완료 후 영어 번역을 표시하고 두 프레임을 그린 뒤 입력을 활성화하며 새 `performance.now()` 원점을 잡는다. 질문 출력 시간은 기록에서 제외한다. 출력 타이머는 화면 이탈 시 취소한다. 종료 안내가 나와도 Enter 누름 상태를 초기화하지 않아 계속 누르고 있던 키로 복귀할 수 없다.
 
 입력 효과음은 input/compositionend 처리 후 `collectTyping(recorder.events)`의 새 활동만 읽어 재생한다. 이 함수는 기존 점 모드와 같은 규칙이며 효과음은 원시 이벤트/최종 문자/저장 시각을 수정하지 않는다. keydown 단독이나 중복 조합 알림을 소리로 세지 않는다. 공백은 포함하고 삭제/수정키/자동 반복/붙여넣기는 제외한다. 같은 659.25Hz/70ms 사인파에 6ms attack/12ms release를 주며, 새 입력이 이전 음을 끊지 않는다. `typingBus`와 소스 Set은 별도이며 질문 전환/처리중/포커스·탭 이탈에는 이 Set만 정리해 앰비언스를 보존한다. 사운드 미활성화·음소거 때는 입력음을 만들지 않는다.
 
@@ -41,7 +41,7 @@ Q3 완료 레코드는 같은 ID로 Store.add 한다. 재시도에도 중복하�
 
 `python -m http.server 8000 --bind 127.0.0.1` 후 `http://127.0.0.1:8000`을 연다. 기존 file 직접 실행도 유지한다. 저장소는 브라우저·origin별 localStorage이며 다른 URL/프로필로 옮길 때 JSON을 백업한다.
 
-- `python scripts/verify-browser.py`: 257/257 통과. 기존 A·이전 B·질문 데이터/운영 기능과 Your Type 상태·Enter·IME 합성 이벤트·오류 재시도·스냅샷·레이어 수명, 순차 질문/입력 원점·효과음·검정 대기·늦은 안내 콜백 취소를 검증했다.
+- `python scripts/verify-browser.py`: 258/258 통과. 기존 A·이전 B·질문 데이터/운영 기능과 Your Type 상태·Enter·IME 합성 이벤트·오류 재시도·스냅샷·레이어 수명, 순차 질문/입력 원점·효과음·검정 대기·늦은 안내 콜백 취소를 검증했다.
 - `python scripts/verify-your-type.py`: 격리된 실제 Chrome에서 처리 5초와 종료 검정 5초를 실제로 기다리고 9개 구간을 끝까지 재생했다. HTTP는 실제 AudioContext에서 입력 활동 10개/효과음 10번 일치를 확인했으며, file은 AudioContext 없는 무음 시계로 완주했다. 질문 출력 시간은 첫 침묵에 포함되지 않았다. 한국어 입력은 합성 DOM 이벤트이며 실제 OS 입력기가 아니다. 원본 질문/답변·더미 16명·현재 관객 1명 JSON 다운로드도 검사했다.
 - `python scripts/verify-questions.py`: 기존 운영 화면의 입력·모스·새로고침·JSON 호환 검증.
 - `python scripts/verify-downloads.py`: A의 네 마디·손글씨·WAV 실제 다운로드 검증.

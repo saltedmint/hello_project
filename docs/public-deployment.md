@@ -1,5 +1,7 @@
 # 공개 Your Type
 
+배포 주소: **https://your-type-greetings.sweetwasp128.chatgpt.site**. 관객 로그인은 필요 없다. [QR PNG](../presentation/your-type-qr.png)와 [실제 배포 검증 기록](../presentation/verification.md)을 함께 제공한다. 발표자 관리는 같은 주소의 `/admin`에서 소유자 계정으로 로그인한다. 서버·DB 연결을 위해 추가 계정 가입이나 키 입력을 할 필요는 없다.
+
 기존 정적 앱을 유지하고 Sites가 제공하는 Worker ESM + D1에 연결한다. 프레임워크나 음원 서비스를 추가하지 않는다. 개인 체험은 브라우저에서 실행하고, 서버는 완료한 세 답변 저장과 결과 진입 시 누적 조회만 담당한다. 로컬 A·기존 B와 운영 화면은 유지한다.
 
 ## 실행과 빌드
